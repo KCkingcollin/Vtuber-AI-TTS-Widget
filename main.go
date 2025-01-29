@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fyne.io/fyne/v2"
+	"fmt"
+
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -11,11 +12,8 @@ func main() {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("VATTS")
 
-	myWindow.Resize(fyne.NewSize(300, 76))
 	myWindow.SetFixedSize(true)
-	myWindow.SetPadded(false)
 	myWindow.CenterOnScreen()
-	myWindow.SetMaster()
 
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder("TTS Input...")
@@ -34,9 +32,8 @@ func main() {
 	myWindow.SetContent(content)
 
 	myWindow.Canvas().Focus(entry)
-
-	// Use ShowAndRun to ensure the window is shown and the event loop is started
-	myWindow.ShowAndRun()
+    fmt.Println("Window show was called")
+    myWindow.ShowAndRun()
 }
 
 func sendText(text string) {
