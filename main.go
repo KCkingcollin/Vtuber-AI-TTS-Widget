@@ -10,7 +10,7 @@ func main() {
 	var inTE *walk.TextEdit
 	var mainWin *walk.MainWindow
 
-	MainWindow{
+	err := MainWindow{
 		AssignTo: &mainWin,
 		Title:    "TTS Input",
 		MinSize:  Size{Width: 250, Height: 120},
@@ -35,7 +35,14 @@ func main() {
 				},
 			},
 		},
-	}.Run()
+	}.Create()
+
+	if err != nil {
+		walk.MsgBox(nil, "Error", "Failed to create window: "+err.Error(), walk.MsgBoxIconError)
+		return
+	}
+
+	mainWin.Run() // Ensures the window stays open
 }
 
 func sendText(inTE *walk.TextEdit, owner walk.Form) {
