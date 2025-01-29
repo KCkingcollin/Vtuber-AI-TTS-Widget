@@ -1,44 +1,33 @@
 package main
 
 import (
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
+	"fmt"
+	"strings"
+
+	"github.com/lxn/walk"
+	. "github.com/lxn/walk/declarative"
 )
 
 func main() {
-	myApp := app.New()
-	myWindow := myApp.NewWindow("VATTS")
+    var inTE *walk.TextEdit
 
-    myWindow.Resize(fyne.NewSize(300, 76))
-	myWindow.SetFixedSize(true)
-	myWindow.SetPadded(false)
-	myWindow.CenterOnScreen()
-	myWindow.SetMaster()
-
-	entry := widget.NewEntry()
-	entry.SetPlaceHolder("TTS Input...")
-
-	button := widget.NewButton(" Press to send (or just press enter) ", func() {
-		sendText(entry.Text)
-		entry.SetText("")
-	})
-
-	entry.OnSubmitted = func(text string) {
-		sendText(text)
-		entry.SetText("")
-	}
-
-	content := container.NewVBox(entry, button)
-	myWindow.SetContent(content)
-
-	myWindow.Show()
-	myWindow.Canvas().Focus(entry)
-
-	myApp.Run()
-}
-
-func sendText(text string) {
-	println("Sending text:", text)
+    MainWindow{
+        Title:   "Text Input Example",
+        MinSize: Size{Width: 100, Height: 75},
+        Layout:  VBox{},
+        Children: []Widget{
+            TextEdit{
+                AssignTo: &inTE,
+                OnKeyPress: func(key walk.Key) {
+                    if key == walk.KeyReturn {
+                        inputText := strings.TrimSpace(inTE.Text())
+                        if inputText != "" {
+                            fmt.Println(inputText)
+                            inTE.SetText("")
+                        }
+                    }
+                },
+            },
+        },
+    }.Run()
 }
