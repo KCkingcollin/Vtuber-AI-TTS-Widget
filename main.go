@@ -1,54 +1,44 @@
 package main
 
 import (
-	"github.com/lxn/walk"
-	. "github.com/lxn/walk/declarative"
-	"strings"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 )
 
 func main() {
-	var inTE *walk.TextEdit
-	var mainWin *walk.MainWindow
+	myApp := app.New()
+	myWindow := myApp.NewWindow("VATTS")
 
-	err := MainWindow{
-		AssignTo: &mainWin,
-		Title:    "TTS Input",
-		MinSize:  Size{Width: 250, Height: 120},
-		Layout:   VBox{},
-		Children: []Widget{
-			TextEdit{
-				AssignTo: &inTE,
-				MinSize:  Size{Width: 200, Height: 40},
-				MaxSize:  Size{Width: 200, Height: 40},
-				Font:     Font{PointSize: 10},
-				OnKeyPress: func(key walk.Key) {
-					if key == walk.KeyReturn {
-						sendText(inTE, mainWin)
-					}
-				},
-			},
-			PushButton{
-				Text: "Send",
-				MinSize: Size{Width: 80, Height: 30},
-				OnClicked: func() {
-					sendText(inTE, mainWin)
-				},
-			},
-		},
-	}.Create()
+	myWindow.Resize(fyne.NewSize(300, 76))
+	myWindow.SetFixedSize(true)
+	myWindow.SetPadded(false)
+	myWindow.CenterOnScreen()
+	myWindow.SetMaster()
 
-	if err != nil {
-		walk.MsgBox(nil, "Error", "Failed to create window: "+err.Error(), walk.MsgBoxIconError)
-		return
+	entry := widget.NewEntry()
+	entry.SetPlaceHolder("TTS Input...")
+
+	button := widget.NewButton(" Press to send (or just press enter) ", func() {
+		sendText(entry.Text)
+		entry.SetText("")
+	})
+
+	entry.OnSubmitted = func(text string) {
+		sendText(text)
+		entry.SetText("")
 	}
 
-	mainWin.Run() // Ensures the window stays open
+	content := container.NewVBox(entry, button)
+	myWindow.SetContent(content)
+
+	myWindow.Canvas().Focus(entry)
+
+	// Use ShowAndRun to ensure the window is shown and the event loop is started
+	myWindow.ShowAndRun()
 }
 
-func sendText(inTE *walk.TextEdit, owner walk.Form) {
-	inputText := strings.TrimSpace(inTE.Text())
-	if inputText != "" {
-		walk.MsgBox(owner, "Input Received", inputText, walk.MsgBoxIconInformation)
-		inTE.SetText("")
-	}
+func sendText(text string) {
+	println("Sending text:", text)
 }
