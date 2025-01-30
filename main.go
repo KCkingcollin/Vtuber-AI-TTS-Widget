@@ -44,7 +44,6 @@ func main() {
 	log.Println("Press Ctrl+M to toggle window minimize state")
 
     go func() {
-        // Register the hotkey
         hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
             if isMinimized {
                 myWindow.Show()
@@ -58,7 +57,6 @@ func main() {
             }
         })
 
-        // Keep the program running
         s := hook.Start()
         <-hook.Process(s)
     }()
