@@ -1,22 +1,28 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"os"
 
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/KCkingcollin/Vtuber-AI-TTS-Widget/src"
 	hook "github.com/robotn/gohook"
 )
 
+var verbose bool
+
 func main() {
-    f, err := os.OpenFile("main.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-    if err != nil {
-        log.Fatal(err)
+    if len(os.Args) > 1 {
+        if os.Args[1] == "-v" || os.Args[1] == "--verbose" {
+            verbose = true
+        }
     }
-    defer f.Close()
-    log.SetOutput(f)
+    err := log.Init("./", "main.log", 1)
+    if err != nil {
+        panic(err)
+    }
 
     myApp := app.New()
     myWindow := myApp.NewWindow("VATTS")
@@ -41,7 +47,7 @@ func main() {
     
 	isMinimized := false
 
-	log.Println("Press Ctrl+M to toggle window minimize state")
+	log.Append("Press Ctrl+M to toggle window minimize state", verbose)
 
     go func() {
         hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
@@ -49,11 +55,11 @@ func main() {
                 myWindow.Show()
                 myWindow.RequestFocus()
                 isMinimized = false
-                log.Println("Window restored")
+                log.Append("Window restored", verbose)
             } else {
                 myWindow.Hide()
                 isMinimized = true
-                log.Println("Window minimized")
+                log.Append("Window minimized", verbose)
             }
         })
 
@@ -63,10 +69,10 @@ func main() {
 
     myWindow.Canvas().Focus(entry)
 
-    log.Println("Window show was called")
+    log.Append("Window show was called", verbose)
     myWindow.ShowAndRun()
 }
 
 func sendText(text string) {
-    println("Sending text:", text)
+    log.Append(fmt.Sprintf("Sending text: %s", text), verbose)
 }
