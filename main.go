@@ -45,7 +45,7 @@ func main() {
 
     go func() {
         // Register the hotkey
-        hook.Register(hook.KeyDown, []string{"ctrl", "m"}, func(e hook.Event) {
+        hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
             if isMinimized {
                 myWindow.Show()
                 myWindow.RequestFocus()
