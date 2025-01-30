@@ -64,13 +64,16 @@ func Append(message string, verbose bool) {
 
     fileSize := int(fi.Size())
     if fileSize > fileLimit {
+        // // for testing
+        // fmt.Println("testing: max file size reached")
+
         b, err := os.ReadFile(logFile)
         if err != nil {
             fmt.Println("Unable to read log file" + err.Error())
             return
         }
 
-        err = file.Truncate(0)
+        err = file.Truncate(int64(fileLimit))
         if err != nil {
             fmt.Println("Unable to truncate log file" + err.Error())
             return
