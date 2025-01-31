@@ -42,24 +42,23 @@ func main() {
     
     content := container.NewVBox(entry, button)
     myWindow.SetContent(content)
-    myWindow.SetFixedSize(true)
     myWindow.CenterOnScreen()
-    
-	isMinimized := false
+
+    isHidden := false
 
 	log.Append("Press Ctrl+M to toggle window minimize state", verbose)
 
     go func() {
         hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
-            if isMinimized {
+            if isHidden {
                 myWindow.Show()
                 myWindow.RequestFocus()
-                isMinimized = false
-                log.Append("Window restored", verbose)
+                isHidden = false
+                log.Append("Window shown", verbose)
             } else {
                 myWindow.Hide()
-                isMinimized = true
-                log.Append("Window minimized", verbose)
+                isHidden = true
+                log.Append("Window hidden", verbose)
             }
         })
 
