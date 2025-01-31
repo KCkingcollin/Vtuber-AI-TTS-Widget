@@ -32,7 +32,7 @@ func main() {
     entry := widget.NewEntry()
     entry.SetPlaceHolder("TTS Input...")
     
-    howMany, _ := robotgo.FindIds("main")
+    howMany, _ := robotgo.FindIds("VATTS")
     if len(howMany) > 1 {
         log.Append("To many processes", verbose)
         error := widget.NewLabel("Error: To many processes")
