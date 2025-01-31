@@ -37,6 +37,7 @@ func main() {
         log.Append("To many processes", verbose)
         error := widget.NewLabel("Error: To many processes")
         text := widget.NewLabel("Just throw in a whole banana (peal included)?")
+        howMany, _ = robotgo.FindIds("VATTS")
         yes := widget.NewButton("YES", func() {
             for i := 0; i < len(howMany); i++ {
                 process, err := os.FindProcess(howMany[i])
