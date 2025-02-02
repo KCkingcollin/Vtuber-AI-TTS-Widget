@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -81,12 +82,34 @@ func checkForDepends() error {
         }
 	}
 
+    // python3 -m venv kokoro-tts/venv
+    // kokoro-tts/venv/bin/pip install onnxruntime kokoro_onnx sounddevice numpy psutil
 	_, err = os.Stat("./kokoro-tts/venv")
 	if os.IsNotExist(err) {
-        err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx", "kokoro-tts/voice.onnx")
+        cmd := exec.Command("python3", "-m", "venv", "kokoro-tts/venv")
+
+        var out bytes.Buffer
+        cmd.Stdout = &out
+        cmd.Stderr = &out
+
+        err := cmd.Run()
         if err != nil {
-            return fmt.Errorf("failed to download file: %v", err)
+            return fmt.Errorf("failed to run command: %v", err)
         }
+
+        log.Append(fmt.Sprintf("Command output:\n%s\n", out.String()), verbose)
+
+        cmd = exec.Command("kokoro-tts/venv/bin/pip", "install", "onnxruntime", "kokoro_onnx", "sounddevice", "numpy", "psutil")
+
+        cmd.Stdout = &out
+        cmd.Stderr = &out
+
+        err = cmd.Run()
+        if err != nil {
+            return fmt.Errorf("failed to run command: %v", err)
+        }
+
+        log.Append(fmt.Sprintf("Command output:\n%s\n", out.String()), verbose)
 	}
 
     return nil
