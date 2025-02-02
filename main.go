@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -22,47 +23,45 @@ import (
 
 var verbose bool
 var conn net.Conn
+var osEnv string
+
+func isCommandAvailable(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
+}
 
 func downloadFile(url, filepath string) error {
-	// Step 1: Send an HTTP GET request to the URL
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("failed to send GET request: %v", err)
+		return fmt.Errorf("failed to send GET request: %e", err)
 	}
 	defer resp.Body.Close()
 
-	// Step 2: Check if the response status code is OK (200)
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("bad status: %s", resp.Status)
 	}
 
-	// Step 3: Create the file to save the downloaded content
 	out, err := os.Create(filepath)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %v", err)
+		return fmt.Errorf("failed to create file: %e", err)
 	}
 	defer out.Close()
 
-	// Step 4: Copy the response body (file content) to the file
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to write file: %v", err)
+		return fmt.Errorf("failed to write file: %e", err)
 	}
 
-	log.Append(fmt.Sprintf("File downloaded successfully: %s\n", filepath), verbose)
+	log.Append(fmt.Sprintf("File downloaded successfully: %s", filepath), verbose)
 	return nil
 }
 
 func checkForDepends() error {
-    // https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json -o kokoro-tts/voices.json     
-    // https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx -o kokoro-tts/kokoro-v0_19.onnx
-    // https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin -o kokoro-tts/voices.bin
-
 	_, err := os.Stat("./kokoro-tts/voices.json")
 	if os.IsNotExist(err) {
         err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json", "kokoro-tts/voices.json")
         if err != nil {
-            return fmt.Errorf("failed to download file: %v", err)
+            return fmt.Errorf("failed to download file: %e", err)
         }
 	}
 
@@ -70,7 +69,7 @@ func checkForDepends() error {
 	if os.IsNotExist(err) {
         err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin", "kokoro-tts/voices.bin")
         if err != nil {
-            return fmt.Errorf("failed to download file: %v", err)
+            return fmt.Errorf("failed to download file: %e", err)
         }
 	}
 
@@ -78,12 +77,27 @@ func checkForDepends() error {
 	if os.IsNotExist(err) {
         err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx", "kokoro-tts/voice.onnx")
         if err != nil {
-            return fmt.Errorf("failed to download file: %v", err)
+            return fmt.Errorf("failed to download file: %e", err)
         }
 	}
 
-    // python3 -m venv kokoro-tts/venv
-    // kokoro-tts/venv/bin/pip install onnxruntime kokoro_onnx sounddevice numpy psutil
+    if !isCommandAvailable("python3") {
+        if osEnv == "windows" {
+            exec.Command("start", "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe").Start()
+            err := fmt.Errorf("Please install python3")
+            log.Append(fmt.Sprint(err), verbose)
+            panic(err)
+        } else if osEnv == "linux" {
+            err := fmt.Errorf("Please install the python3 package")
+            log.Append(fmt.Sprint(err), verbose)
+            panic(err)
+        } else {
+            err := fmt.Errorf("Your OS is not supported")
+            log.Append(fmt.Sprint(err), verbose)
+            panic(err)
+        }
+    }
+
 	_, err = os.Stat("./kokoro-tts/venv")
 	if os.IsNotExist(err) {
         cmd := exec.Command("python3", "-m", "venv", "kokoro-tts/venv")
@@ -94,22 +108,30 @@ func checkForDepends() error {
 
         err := cmd.Run()
         if err != nil {
-            return fmt.Errorf("failed to run command: %v", err)
+            return fmt.Errorf("failed to run command: %e", err)
         }
 
-        log.Append(fmt.Sprintf("Command output:\n%s\n", out.String()), verbose)
+        log.Append(fmt.Sprintf("Command output: %s", out.String()), verbose)
 
-        cmd = exec.Command("kokoro-tts/venv/bin/pip", "install", "onnxruntime", "kokoro_onnx", "sounddevice", "numpy", "psutil")
+        if osEnv == "linux" {
+            cmd = exec.Command("kokoro-tts/venv/bin/pip", "install", "onnxruntime", "kokoro_onnx", "sounddevice", "numpy", "psutil")
+        } else if osEnv == "windows" {
+            cmd = exec.Command("kokoro-tts/venv/Scripts/pip.exe", "install", "onnxruntime", "kokoro_onnx", "sounddevice", "numpy", "psutil")
+        } else { 
+            err := fmt.Errorf("os not supported")
+            log.Append(fmt.Sprint(err), verbose)
+            panic(err)
+        }
 
         cmd.Stdout = &out
         cmd.Stderr = &out
 
         err = cmd.Run()
         if err != nil {
-            return fmt.Errorf("failed to run command: %v", err)
+            return fmt.Errorf("failed to run command: %e", err)
         }
 
-        log.Append(fmt.Sprintf("Command output:\n%s\n", out.String()), verbose)
+        log.Append(fmt.Sprintf("Command output:%s", out.String()), verbose)
 	}
 
     return nil
@@ -124,12 +146,31 @@ func main() {
     if err := log.Init("./", "main.log", 1); err != nil {
         panic(err)
     }
+
+    osEnv = runtime.GOOS
+    log.Append(fmt.Sprintf("Operating system: %s", osEnv), verbose)
+
     if err := checkForDepends(); err != nil {
-        log.Append(fmt.Sprintf("%e", err), verbose)
+        log.Append(fmt.Sprint(err), verbose)
     }
 
-    server := exec.Command("kokoro-tts/venv/bin/python", "kokoro-tts/tts-server.py")
-    server.Start()
+    if osEnv == "linux" {
+        server := exec.Command("kokoro-tts/venv/bin/python", "kokoro-tts/tts-server.py")
+        err := server.Start()
+        if err != nil {
+            log.Append(fmt.Sprintf("failed to run server: %e", err), verbose)
+        }
+    } else if osEnv == "windows" {
+        server := exec.Command("kokoro-tts/venv/Scripts/python.exe", "kokoro-tts/tts-server.py")
+        err := server.Start()
+        if err != nil {
+            log.Append(fmt.Sprintf("failed to run server: %e", err), verbose)
+        }
+    } else {
+        err := fmt.Errorf("os not supported")
+        log.Append(fmt.Sprint(err), verbose)
+        panic(err)
+    }
 
     var err error
     conn, err = net.Dial("tcp", "localhost:65432")
@@ -138,7 +179,7 @@ func main() {
         conn, err = net.Dial("tcp", "localhost:65432")
         if i >= 4 {
             log.Append(fmt.Sprintf("Error connecting: %e", err), verbose)
-            return
+            panic(err)
         }
     }
     defer conn.Close()
@@ -156,7 +197,7 @@ func main() {
         text := widget.NewLabel("Just throw in a whole banana (peal included)?")
         howMany, _ = robotgo.FindIds("VATTS")
         yes := widget.NewButton("YES", func() {
-            for true {
+            for {
                 howMany, _ = robotgo.FindIds("VATTS")
                 if len(howMany) <= 1 {
                     message := widget.NewLabel("VATTS apps air subscription revoked")
@@ -210,7 +251,6 @@ func main() {
     isHidden := false
 
 	log.Append("Press Ctrl+M to toggle window minimize state", verbose)
-
 
     go func() {
         hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
