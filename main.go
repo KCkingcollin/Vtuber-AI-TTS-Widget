@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -177,7 +178,7 @@ func main() {
     for i := 0; err != nil; i++ {
         time.Sleep(time.Second)
         conn, err = net.Dial("tcp", "localhost:65432")
-        if i >= 4 {
+        if i >= 9 {
             log.Append(fmt.Sprintf("Error connecting: %e", err), verbose)
             panic(err)
         }
