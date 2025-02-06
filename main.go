@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"syscall"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -26,9 +26,19 @@ var verbose bool
 var conn net.Conn
 var osEnv string
 
-func isCommandAvailable(command string) bool {
-	_, err := exec.LookPath(command)
-	return err == nil
+func isPython() bool {
+	cmd := exec.Command("python", "--version")
+    output, err := cmd.StdoutPipe()
+    if err != nil {
+        return false
+    }
+    cmd.Run()
+    stdout := bufio.NewReader(output)
+    text, _ := stdout.ReadString(0)
+    if strings.Contains(text, "3.13") {
+        return true
+    }
+	return false
 }
 
 func downloadFile(url, filepath string) error {
@@ -82,22 +92,22 @@ func checkForDepends() error {
         }
 	}
 
-    if !isCommandAvailable("python3") {
-        if osEnv == "windows" {
-            exec.Command("start", "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe").Start()
-            err := fmt.Errorf("Please install python3")
-            log.Append(fmt.Sprint(err), verbose)
-            panic(err)
-        } else if osEnv == "linux" {
-            err := fmt.Errorf("Please install the python3 package")
-            log.Append(fmt.Sprint(err), verbose)
-            panic(err)
-        } else {
-            err := fmt.Errorf("Your OS is not supported")
-            log.Append(fmt.Sprint(err), verbose)
-            panic(err)
-        }
-    }
+    // if !isPython() {
+    //     if osEnv == "windows" {
+    //         exec.Command("start", "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe").Start()
+    //         err := fmt.Errorf("Please install python3")
+    //         log.Append(fmt.Sprint(err), verbose)
+    //         panic(err)
+    //     } else if osEnv == "linux" {
+    //         err := fmt.Errorf("Please install the python3 package")
+    //         log.Append(fmt.Sprint(err), verbose)
+    //         panic(err)
+    //     } else {
+    //         err := fmt.Errorf("Your OS is not supported")
+    //         log.Append(fmt.Sprint(err), verbose)
+    //         panic(err)
+    //     }
+    // }
 
 	_, err = os.Stat("./kokoro-tts/venv")
 	if os.IsNotExist(err) {
@@ -155,14 +165,15 @@ func main() {
         log.Append(fmt.Sprint(err), verbose)
     }
 
+    var server *exec.Cmd
     if osEnv == "linux" {
-        server := exec.Command("kokoro-tts/venv/bin/python", "kokoro-tts/tts-server.py")
+        server = exec.Command("kokoro-tts/venv/bin/python", "kokoro-tts/tts-server.py")
         err := server.Start()
         if err != nil {
             log.Append(fmt.Sprintf("failed to run server: %e", err), verbose)
         }
     } else if osEnv == "windows" {
-        server := exec.Command("kokoro-tts/venv/Scripts/python.exe", "kokoro-tts/tts-server.py")
+        server = exec.Command("kokoro-tts/venv/Scripts/python.exe", "kokoro-tts/tts-server.py")
         err := server.Start()
         if err != nil {
             log.Append(fmt.Sprintf("failed to run server: %e", err), verbose)
@@ -172,6 +183,7 @@ func main() {
         log.Append(fmt.Sprint(err), verbose)
         panic(err)
     }
+    defer server.Process.Kill()
 
     var err error
     conn, err = net.Dial("tcp", "localhost:65432")
@@ -210,14 +222,24 @@ func main() {
                     time.Sleep(time.Second*3)
                     os.Exit(0)
                 } else {
-                    howMany, _ = robotgo.FindIds("VATTS")
-                    for i := 0; i < len(howMany); i++ {
+                    serverIDs, _ := robotgo.FindIds("tts-server")
+                    for i := 0; i < len(serverIDs); i++ {
                         if os.Getpid() != howMany[i] {
-                            process, err := os.FindProcess(howMany[i])
+                            TTSprocess, err := os.FindProcess(serverIDs[i])
                             if err != nil {
                                 log.Append(fmt.Sprintf("%e", err), verbose)
                             }
-                            process.Kill()
+                            TTSprocess.Kill()
+                        }
+                    }
+                    howMany, _ = robotgo.FindIds("VATTS")
+                    for i := 0; i < len(howMany); i++ {
+                        if os.Getpid() != howMany[i] {
+                            GUIprocess, err := os.FindProcess(howMany[i])
+                            if err != nil {
+                                log.Append(fmt.Sprintf("%e", err), verbose)
+                            }
+                            GUIprocess.Kill()
                         }
                     }
                 }
