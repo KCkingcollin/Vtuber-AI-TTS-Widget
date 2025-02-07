@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -25,21 +24,8 @@ import (
 var verbose bool
 var conn net.Conn
 var osEnv string
-
-func isPython() bool {
-	cmd := exec.Command("python", "--version")
-    output, err := cmd.StdoutPipe()
-    if err != nil {
-        return false
-    }
-    cmd.Run()
-    stdout := bufio.NewReader(output)
-    text, _ := stdout.ReadString(0)
-    if strings.Contains(text, "3.13") {
-        return true
-    }
-	return false
-}
+var mainApp fyne.App
+var mainWindow fyne.Window
 
 func downloadFile(url, filepath string) error {
 	resp, err := http.Get(url)
@@ -67,50 +53,62 @@ func downloadFile(url, filepath string) error {
 	return nil
 }
 
-func checkForDepends() error {
-	_, err := os.Stat("./kokoro-tts/voices.json")
-	if os.IsNotExist(err) {
+func checkForDepends() {
+    _, err := os.Stat("./kokoro-tts/voices.json")
+    if installLock("voices.json.loc") || os.IsNotExist(err) {
+        installLock("voices.json.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Downloading voices.json\nPlease do not close this window")
+        mainWindow.Content().Refresh()
         err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json", "kokoro-tts/voices.json")
         if err != nil {
-            return fmt.Errorf("failed to download file: %e", err)
+            log.Append(fmt.Sprintf("failed to download file: %e", err), true)
+            os.Exit(1)
         }
-	}
+        installLock("voices.json.loc", false)
+    }
 
-	_, err = os.Stat("./kokoro-tts/voices.bin")
-	if os.IsNotExist(err) {
+    _, err = os.Stat("./kokoro-tts/voices.bin")
+    if installLock("voices.bin.loc") || os.IsNotExist(err) {
+        installLock("voices.bin.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Downloading voices.bin\nPlease do not close this window")
+        mainWindow.Content().Refresh()
         err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin", "kokoro-tts/voices.bin")
         if err != nil {
-            return fmt.Errorf("failed to download file: %e", err)
+            log.Append(fmt.Sprintf("failed to download file: %e", err), true)
+            os.Exit(1)
         }
-	}
+        installLock("voices.bin.loc", false)
+    }
 
-	_, err = os.Stat("./kokoro-tts/voice.onnx")
-	if os.IsNotExist(err) {
+    _, err = os.Stat("./kokoro-tts/voice.onnx")
+    if installLock("voice.onnx.loc") || os.IsNotExist(err) {
+        installLock("voice.onnx.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Downloading voice.onnx\nPlease do not close this window")
+        mainWindow.Content().Refresh()
         err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx", "kokoro-tts/voice.onnx")
         if err != nil {
-            return fmt.Errorf("failed to download file: %e", err)
+            log.Append(fmt.Sprintf("failed to download file: %e", err), true)
+            os.Exit(1)
         }
-	}
+        installLock("voice.onnx.loc", false)
+    }
 
-    // if !isPython() {
-    //     if osEnv == "windows" {
-    //         exec.Command("start", "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe").Start()
-    //         err := fmt.Errorf("Please install python3")
-    //         log.Append(fmt.Sprint(err), verbose)
-    //         panic(err)
-    //     } else if osEnv == "linux" {
-    //         err := fmt.Errorf("Please install the python3 package")
-    //         log.Append(fmt.Sprint(err), verbose)
-    //         panic(err)
-    //     } else {
-    //         err := fmt.Errorf("Your OS is not supported")
-    //         log.Append(fmt.Sprint(err), verbose)
-    //         panic(err)
-    //     }
-    // }
+    mainWindow = textPopupWindow(mainWindow, "Setting up python environment\nPlease do not close this window")
+    mainWindow.Content().Refresh()
 
-	_, err = os.Stat("./kokoro-tts/venv")
-	if os.IsNotExist(err) {
+    if osEnv == "linux" {
+        _, err = os.Stat("kokoro-tts/venv/bin/tts-server-py-bin")
+    } else if osEnv == "windows" {
+        _, err = os.Stat("kokoro-tts/venv/Scripts/tts-server-py-bin.exe")
+    } else { 
+        log.Append("os not supported", verbose)
+        os.Exit(1)
+    }
+
+    venvInstall := os.IsNotExist(err) 
+
+    if installLock("pipvenv.loc") || venvInstall {
+        installLock("pipvenv.loc", true)
         cmd := exec.Command("python", "-m", "venv", "kokoro-tts/venv")
 
         var out bytes.Buffer
@@ -119,11 +117,54 @@ func checkForDepends() error {
 
         err := cmd.Run()
         if err != nil {
-            return fmt.Errorf("failed to run command: %e", err)
+            log.Append(fmt.Sprintf("failed to run command: %e", err), true)
+            os.Exit(1)
         }
 
         log.Append(fmt.Sprintf("Command output: %s", out.String()), verbose)
 
+        var sourceFile string
+        var destFile string
+        if osEnv == "linux" {
+            sourceFile = "kokoro-tts/venv/bin/python"
+            destFile = "kokoro-tts/venv/bin/tts-server-py-bin"
+        } else if osEnv == "windows" {
+            sourceFile = "kokoro-tts/venv/Scripts/pythonw.exe"
+            destFile = "kokoro-tts/venv/Scripts/tts-server-py-bin.exe"
+        } else { 
+            log.Append("os not supported", true)
+            os.Exit(1)
+        }
+
+        from, err := os.Open(sourceFile)
+        if err != nil {
+            error := fmt.Sprint(err)
+            log.Append(error, true)
+        }
+        defer from.Close()
+
+        to, err := os.OpenFile(destFile, os.O_RDWR|os.O_CREATE, 0755)
+        if err != nil {
+            error := fmt.Sprint(err)
+            log.Append(error, true)
+        }
+        defer to.Close()
+
+        _, err = io.Copy(to, from)
+        if err != nil {
+            error := fmt.Sprint(err)
+            log.Append(error, true)
+        }
+        installLock("pipvenv.loc", false)
+        time.Sleep(time.Second)
+    }
+
+    if installLock("pipdepend.loc") || venvInstall {
+        installLock("pipdepend.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Installing python dependencies\nThis could take a while, do not close this or the terminal window")
+        mainWindow.Content().Refresh()
+
+        var cmd *exec.Cmd
         if osEnv == "linux" {
             cmd = exec.Command("kokoro-tts/venv/bin/pip", "install", "onnxruntime", "kokoro_onnx", "sounddevice", "numpy", "psutil")
         } else if osEnv == "windows" {
@@ -134,64 +175,45 @@ func checkForDepends() error {
             panic(err)
         }
 
+        var out bytes.Buffer
         cmd.Stdout = &out
         cmd.Stderr = &out
 
         err = cmd.Run()
         if err != nil {
-            return fmt.Errorf("failed to run command: %e", err)
+            log.Append(fmt.Sprintf("failed to run command: %e", err), verbose)
+            os.Exit(1)
         }
 
         log.Append(fmt.Sprintf("Command output:%s", out.String()), verbose)
+        installLock("pipdepend.loc", false)
+        time.Sleep(time.Second*5)
     }
+}
 
-    if osEnv == "linux" {
-        _, err = os.Stat("kokoro-tts/venv/bin/tts-server-py-bin")
-    } else if osEnv == "windows" {
-        _, err = os.Stat("kokoro-tts/venv/Scripts/tts-server-py-bin.exe")
-    } else { 
-        err := fmt.Errorf("os not supported")
-        log.Append(fmt.Sprint(err), verbose)
-        panic(err)
-    }
+func textPopupWindow(textWindow fyne.Window, text string) fyne.Window {
+    label := widget.NewLabel(text)
+    label.Alignment = fyne.TextAlignCenter
+    content := container.NewVBox(label)
+    textWindow.SetContent(container.NewVBox(content))
+    return textWindow
+}
 
-	if os.IsNotExist(err) {
-        var sourceFile string
-        var destFile string
-        if osEnv == "linux" {
-            sourceFile = "kokoro-tts/venv/bin/python"
-            destFile = "kokoro-tts/venv/bin/tts-server-py-bin"
-        } else if osEnv == "windows" {
-            sourceFile = "kokoro-tts/venv/Scripts/python.exe"
-            destFile = "kokoro-tts/venv/Scripts/tts-server-py-bin.exe"
-        } else { 
-            err := fmt.Errorf("os not supported")
-            log.Append(fmt.Sprint(err), verbose)
-            panic(err)
-        }
-
-        from, err := os.Open(sourceFile)
-        if err != nil {
-            error := fmt.Sprint(err)
-            log.Append(error, verbose)
-        }
-        defer from.Close()
-
-        to, err := os.OpenFile(destFile, os.O_RDWR|os.O_CREATE, 0755)
-        if err != nil {
-            error := fmt.Sprint(err)
-            log.Append(error, verbose)
-        }
-        defer to.Close()
-
-        _, err = io.Copy(to, from)
-        if err != nil {
-            error := fmt.Sprint(err)
-            log.Append(error, verbose)
+func installLock(name string, enable ...bool) bool {
+    if len(enable) < 1 {
+        _, err := os.Stat(name)
+        if os.IsNotExist(err) {return false} else {return true}
+    } else {
+        if enable[0] {
+            _, err := os.Create(name)
+            if err != nil {
+                log.Append(fmt.Sprint(err), verbose)
+            }
+        } else {
+            os.Remove(name)
         }
     }
-
-    return nil
+    return false
 }
 
 func main() {
@@ -204,134 +226,142 @@ func main() {
         panic(err)
     }
 
-    osEnv = runtime.GOOS
-    log.Append(fmt.Sprintf("Operating system: %s", osEnv), verbose)
-
-    if err := checkForDepends(); err != nil {
-        log.Append(fmt.Sprint(err), verbose)
-    }
+    mainApp = app.New()
+    mainWindow = mainApp.NewWindow("VATTS")
 
     var server *exec.Cmd
-    if osEnv == "linux" {
-        server = exec.Command("kokoro-tts/venv/bin/tts-server-py-bin", "kokoro-tts/tts-server.py")
-        err := server.Start()
-        if err != nil {
-            log.Append(fmt.Sprintf("failed to run server: %e", err), verbose)
-        }
-    } else if osEnv == "windows" {
-        server = exec.Command("kokoro-tts/venv/Scripts/tts-server-py-bin.exe", "kokoro-tts/tts-server.py")
-        err := server.Start()
-        if err != nil {
-            log.Append(fmt.Sprintf("failed to run server: %e", err), verbose)
-        }
-    } else {
-        err := fmt.Errorf("os not supported")
-        log.Append(fmt.Sprint(err), verbose)
-        panic(err)
-    }
+    go func() {
+        osEnv = runtime.GOOS
+        log.Append(fmt.Sprintf("Operating system: %s", osEnv), verbose)
 
-    var err error
-    conn, err = net.Dial("tcp", "localhost:65432")
-    for i := 0; err != nil; i++ {
-        time.Sleep(time.Second)
+        log.Append("Checking for dependencies", verbose)
+        checkForDepends()
+        log.Append("Dependencies installed", verbose)
+
+        log.Append("Starting server", verbose)
+        if osEnv == "linux" {
+            server = exec.Command("kokoro-tts/venv/bin/tts-server-py-bin", "kokoro-tts/tts-server.py")
+            err := server.Start()
+            if err != nil {
+                log.Append(fmt.Sprintf("failed to run server: %e", err), true)
+                os.Exit(1)
+            }
+        } else if osEnv == "windows" {
+            server = exec.Command("kokoro-tts/venv/Scripts/tts-server-py-bin.exe", "kokoro-tts/tts-server.py")
+            err := server.Start()
+            if err != nil {
+                log.Append(fmt.Sprintf("failed to run server: %e", err), true)
+                os.Exit(1)
+            }
+        } else {
+            err := fmt.Errorf("os not supported")
+            log.Append(fmt.Sprint(err), true)
+            os.Exit(1)
+        }
+        log.Append("Server started", verbose)
+
+        log.Append("Connecting to TTS server", verbose)
+        var err error
         conn, err = net.Dial("tcp", "localhost:65432")
-        if i >= 30 {
-            log.Append(fmt.Sprintf("Error connecting: %e", err), verbose)
-            panic(err)
+        for i := 0; err != nil; i++ {
+            time.Sleep(time.Second)
+            conn, err = net.Dial("tcp", "localhost:65432")
+            if i >= 30 {
+                log.Append(fmt.Sprintf("Error connecting: %e", err), true)
+                os.Exit(1)
+            }
         }
-    }
-    defer conn.Close()
+        defer conn.Close()
+        log.Append("Connected to TTS server", verbose)
 
-    myApp := app.New()
-    myWindow := myApp.NewWindow("VATTS")
-    
-    entry := widget.NewEntry()
-    entry.SetPlaceHolder("TTS Input...")
-    
-    howMany, _ := robotgo.FindIds("VATTS")
-    serverIDs, _ := robotgo.FindIds("tts-server-py-bin")
-    if len(howMany) > 1 || len(serverIDs) > 1 {
-        log.Append("To many processes", verbose)
-        error := widget.NewLabel("Error: To many processes")
-        text := widget.NewLabel("Just throw in a whole banana (peal included)?")
-        howMany, _ = robotgo.FindIds("VATTS")
-        serverIDs, _ = robotgo.FindIds("tts-server-py-bin")
-        yes := widget.NewButton("YES", func() {
-            for {
-                howMany, _ = robotgo.FindIds("VATTS")
-                if len(howMany) <= 1 {
-                    message := widget.NewLabel("VATTS apps air subscription revoked")
-                    popup := widget.NewModalPopUp(
-                        container.NewVBox(message),
-                        myWindow.Canvas(),
-                    )
-                    popup.Show()
-                    time.Sleep(time.Second*2)
-                    server.Process.Kill()
-                    os.Exit(0)
-                } else {
-                    serverIDs, _ = robotgo.FindIds("tts-server-py-bin")
-                    for i := 0; i < len(serverIDs); i++ {
-                        if os.Getpid() != howMany[i] {
-                            TTSprocess, err := os.FindProcess(serverIDs[i])
-                            if err != nil {
-                                log.Append(fmt.Sprintf("%e", err), verbose)
-                            }
-                            TTSprocess.Kill()
-                        }
-                    }
+        log.Append("Looking for running VATTS apps", verbose)
+        howMany, _ := robotgo.FindIds("VATTS")
+        serverIDs, _ := robotgo.FindIds("tts-server-py-bin")
+        if len(howMany) > 1 || len(serverIDs) > 1 {
+            log.Append("To many processes", verbose)
+            error := widget.NewLabel("Error: To many processes")
+            text := widget.NewLabel("Just throw in a whole banana (peal included)?")
+            howMany, _ = robotgo.FindIds("VATTS")
+            serverIDs, _ = robotgo.FindIds("tts-server-py-bin")
+            yes := widget.NewButton("YES", func() {
+                for {
                     howMany, _ = robotgo.FindIds("VATTS")
-                    for i := 0; i < len(howMany); i++ {
-                        if os.Getpid() != howMany[i] {
-                            GUIprocess, err := os.FindProcess(howMany[i])
-                            if err != nil {
-                                log.Append(fmt.Sprintf("%e", err), verbose)
+                    if len(howMany) <= 1 {
+                        message := widget.NewLabel("VATTS apps air subscription revoked")
+                        popup := widget.NewModalPopUp(
+                            container.NewVBox(message),
+                            mainWindow.Canvas(),
+                        )
+                        popup.Show()
+                        time.Sleep(time.Second*2)
+                        server.Process.Kill()
+                        os.Exit(0)
+                    } else {
+                        serverIDs, _ = robotgo.FindIds("tts-server-py-bin")
+                        for i := 0; i < len(serverIDs); i++ {
+                            if os.Getpid() != howMany[i] {
+                                TTSprocess, err := os.FindProcess(serverIDs[i])
+                                if err != nil {
+                                    log.Append(fmt.Sprintf("%e", err), true)
+                                }
+                                TTSprocess.Kill()
                             }
-                            GUIprocess.Kill()
+                        }
+                        howMany, _ = robotgo.FindIds("VATTS")
+                        for i := 0; i < len(howMany); i++ {
+                            if os.Getpid() != howMany[i] {
+                                GUIprocess, err := os.FindProcess(howMany[i])
+                                if err != nil {
+                                    log.Append(fmt.Sprintf("%e", err), true)
+                                }
+                                GUIprocess.Kill()
+                            }
                         }
                     }
                 }
-            }
-        })
-        no := widget.NewButton("no", func() {
-            os.Exit(0)
-        })
-        text.Alignment = fyne.TextAlignCenter
-        error.Alignment = fyne.TextAlignCenter
-        buttons := container.NewHBox(yes, no)
-        centeredButtons := container.NewCenter(buttons)
-        content := container.NewVBox(error, text, centeredButtons)
-        myWindow.SetContent(container.NewVBox(content))
-        myWindow.ShowAndRun()
-    }
+            })
+            no := widget.NewButton("no", func() {
+                os.Exit(0)
+            })
+            text.Alignment = fyne.TextAlignCenter
+            error.Alignment = fyne.TextAlignCenter
+            buttons := container.NewHBox(yes, no)
+            centeredButtons := container.NewCenter(buttons)
+            content := container.NewVBox(error, text, centeredButtons)
+            mainWindow.SetContent(container.NewVBox(content))
+            for {time.Sleep(time.Second)}
+        }
+        log.Append("Found no other running VATTS apps", verbose)
 
-    button := widget.NewButton(" Press to send (or just press enter) ", func() {
-        sendText(entry.Text)
-        entry.SetText("")
-    })
-    
-    entry.OnSubmitted = func(text string) {
-        sendText(text)
-        entry.SetText("")
-    }
-    
-    content := container.NewVBox(entry, button)
-    myWindow.SetContent(content)
-    myWindow.CenterOnScreen()
+        log.Append("Setting up main window", verbose)
+        entry := widget.NewEntry()
+        entry.SetPlaceHolder("TTS Input...")
+        button := widget.NewButton(" Press to send (or just press enter) ", func() {
+            sendText(entry.Text)
+            entry.SetText("")
+        })
+        entry.OnSubmitted = func(text string) {
+            sendText(text)
+            entry.SetText("")
+        }
+        content := container.NewVBox(entry, button)
+        mainWindow.SetContent(content)
+        mainWindow.CenterOnScreen()
+        log.Append("Set up of main window done", verbose)
+        mainWindow.Canvas().Focus(entry)
+    }()
 
+    log.Append("Key hook started", verbose)
     isHidden := false
-
-	log.Append("Press Ctrl+Shift+M to toggle window minimize state", verbose)
-
     go func() {
         hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
             if isHidden {
-                myWindow.Show()
-                myWindow.RequestFocus()
+                mainWindow.Show()
+                mainWindow.RequestFocus()
                 isHidden = false
                 log.Append("Window shown", verbose)
             } else {
-                myWindow.Hide()
+                mainWindow.Hide()
                 isHidden = true
                 log.Append("Window hidden", verbose)
             }
@@ -341,10 +371,9 @@ func main() {
         <-hook.Process(s)
     }()
 
-    myWindow.Canvas().Focus(entry)
-
-    log.Append("Window show was called", verbose)
-    myWindow.ShowAndRun()
+    log.Append("Window show and run called", verbose)
+    log.Append("Press Ctrl+Shift+M to toggle window minimize state", true)
+    mainWindow.ShowAndRun()
     defer server.Process.Kill()
 }
 
@@ -353,14 +382,14 @@ func sendText(text string) {
 		// Send text to server
         _, err := fmt.Fprintf(conn, "%s\n", text)
 		if err != nil {
-			log.Append(fmt.Sprintf("Error sending text: %e", err), verbose)
+			log.Append(fmt.Sprintf("Error sending text: %e", err), true)
 			return
 		}
 
 		// Wait for acknowledgment
 		response, err := bufio.NewReader(conn).ReadString('\n')
 		if err != nil {
-			log.Append(fmt.Sprintf("Error reading response: %e", err), verbose)
+			log.Append(fmt.Sprintf("Error reading response: %e", err), true)
 			return
 		}
         log.Append(fmt.Sprintf("Server response: %s", response), verbose)
