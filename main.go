@@ -205,10 +205,11 @@ func installLock(name string, enable ...bool) bool {
         if os.IsNotExist(err) {return false} else {return true}
     } else {
         if enable[0] {
-            _, err := os.Create(name)
+            file, err := os.Create(name)
             if err != nil {
                 log.Append(fmt.Sprint(err), verbose)
             }
+            defer file.Close()
         } else {
             os.Remove(name)
         }
@@ -238,6 +239,8 @@ func main() {
         checkForDepends()
         log.Append("Dependencies installed", verbose)
 
+        mainWindow = textPopupWindow(mainWindow, "Starting TTS engine")
+        mainWindow.Content().Refresh()
         log.Append("Starting server", verbose)
         if osEnv == "linux" {
             server = exec.Command("kokoro-tts/venv/bin/tts-server-py-bin", "kokoro-tts/tts-server.py")
@@ -271,9 +274,10 @@ func main() {
                 os.Exit(1)
             }
         }
-        defer conn.Close()
         log.Append("Connected to TTS server", verbose)
 
+        mainWindow = textPopupWindow(mainWindow, "Looking for other running VATTS apps")
+        mainWindow.Content().Refresh()
         log.Append("Looking for running VATTS apps", verbose)
         howMany, _ := robotgo.FindIds("VATTS")
         serverIDs, _ := robotgo.FindIds("tts-server-py-bin")
@@ -349,31 +353,32 @@ func main() {
         mainWindow.CenterOnScreen()
         log.Append("Set up of main window done", verbose)
         mainWindow.Canvas().Focus(entry)
-    }()
 
-    log.Append("Key hook started", verbose)
-    isHidden := false
-    go func() {
-        hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
-            if isHidden {
-                mainWindow.Show()
-                mainWindow.RequestFocus()
-                isHidden = false
-                log.Append("Window shown", verbose)
-            } else {
-                mainWindow.Hide()
-                isHidden = true
-                log.Append("Window hidden", verbose)
-            }
-        })
+        log.Append("Key hook started", verbose)
+        isHidden := false
+        go func() {
+            hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
+                if isHidden {
+                    mainWindow.Show()
+                    mainWindow.RequestFocus()
+                    isHidden = false
+                    log.Append("Window shown", verbose)
+                } else {
+                    mainWindow.Hide()
+                    isHidden = true
+                    log.Append("Window hidden", verbose)
+                }
+            })
 
-        s := hook.Start()
-        <-hook.Process(s)
+            s := hook.Start()
+            <-hook.Process(s)
+        }()
     }()
 
     log.Append("Window show and run called", verbose)
     log.Append("Press Ctrl+Shift+M to toggle window minimize state", true)
     mainWindow.ShowAndRun()
+    defer conn.Close()
     defer server.Process.Kill()
 }
 
