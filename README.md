@@ -1,6 +1,8 @@
 # Vtuber-AI-TTS-Widget
 VATTS (Vtuber-AI-TTS-Widget)
 
+For linux you'll need the python package
+
 For Windows you'll need vs runtime 2015+ and python 3.13+
 
 https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#visual-studio-2015-2017-2019-and-2022
