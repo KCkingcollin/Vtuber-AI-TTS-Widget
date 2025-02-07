@@ -111,7 +111,7 @@ func checkForDepends() error {
 
 	_, err = os.Stat("./kokoro-tts/venv")
 	if os.IsNotExist(err) {
-        cmd := exec.Command("python3", "-m", "venv", "kokoro-tts/venv")
+        cmd := exec.Command("python", "-m", "venv", "kokoro-tts/venv")
 
         var out bytes.Buffer
         cmd.Stdout = &out
@@ -143,7 +143,53 @@ func checkForDepends() error {
         }
 
         log.Append(fmt.Sprintf("Command output:%s", out.String()), verbose)
-	}
+    }
+
+    if osEnv == "linux" {
+        _, err = os.Stat("kokoro-tts/venv/bin/tts-server-py-bin")
+    } else if osEnv == "windows" {
+        _, err = os.Stat("kokoro-tts/venv/Scripts/tts-server-py-bin.exe")
+    } else { 
+        err := fmt.Errorf("os not supported")
+        log.Append(fmt.Sprint(err), verbose)
+        panic(err)
+    }
+
+	if os.IsNotExist(err) {
+        var sourceFile string
+        var destFile string
+        if osEnv == "linux" {
+            sourceFile = "kokoro-tts/venv/bin/python"
+            destFile = "kokoro-tts/venv/bin/tts-server-py-bin"
+        } else if osEnv == "windows" {
+            sourceFile = "kokoro-tts/venv/Scripts/python.exe"
+            destFile = "kokoro-tts/venv/Scripts/tts-server-py-bin.exe"
+        } else { 
+            err := fmt.Errorf("os not supported")
+            log.Append(fmt.Sprint(err), verbose)
+            panic(err)
+        }
+
+        from, err := os.Open(sourceFile)
+        if err != nil {
+            error := fmt.Sprint(err)
+            log.Append(error, verbose)
+        }
+        defer from.Close()
+
+        to, err := os.OpenFile(destFile, os.O_RDWR|os.O_CREATE, 0755)
+        if err != nil {
+            error := fmt.Sprint(err)
+            log.Append(error, verbose)
+        }
+        defer to.Close()
+
+        _, err = io.Copy(to, from)
+        if err != nil {
+            error := fmt.Sprint(err)
+            log.Append(error, verbose)
+        }
+    }
 
     return nil
 }
@@ -167,13 +213,13 @@ func main() {
 
     var server *exec.Cmd
     if osEnv == "linux" {
-        server = exec.Command("kokoro-tts/venv/bin/python", "kokoro-tts/tts-server.py")
+        server = exec.Command("kokoro-tts/venv/bin/tts-server-py-bin", "kokoro-tts/tts-server.py")
         err := server.Start()
         if err != nil {
             log.Append(fmt.Sprintf("failed to run server: %e", err), verbose)
         }
     } else if osEnv == "windows" {
-        server = exec.Command("kokoro-tts/venv/Scripts/python.exe", "kokoro-tts/tts-server.py")
+        server = exec.Command("kokoro-tts/venv/Scripts/tts-server-py-bin.exe", "kokoro-tts/tts-server.py")
         err := server.Start()
         if err != nil {
             log.Append(fmt.Sprintf("failed to run server: %e", err), verbose)
@@ -183,14 +229,13 @@ func main() {
         log.Append(fmt.Sprint(err), verbose)
         panic(err)
     }
-    defer server.Process.Kill()
 
     var err error
     conn, err = net.Dial("tcp", "localhost:65432")
     for i := 0; err != nil; i++ {
         time.Sleep(time.Second)
         conn, err = net.Dial("tcp", "localhost:65432")
-        if i >= 9 {
+        if i >= 30 {
             log.Append(fmt.Sprintf("Error connecting: %e", err), verbose)
             panic(err)
         }
@@ -204,11 +249,13 @@ func main() {
     entry.SetPlaceHolder("TTS Input...")
     
     howMany, _ := robotgo.FindIds("VATTS")
-    if len(howMany) > 1 {
+    serverIDs, _ := robotgo.FindIds("tts-server-py-bin")
+    if len(howMany) > 1 || len(serverIDs) > 1 {
         log.Append("To many processes", verbose)
         error := widget.NewLabel("Error: To many processes")
         text := widget.NewLabel("Just throw in a whole banana (peal included)?")
         howMany, _ = robotgo.FindIds("VATTS")
+        serverIDs, _ = robotgo.FindIds("tts-server-py-bin")
         yes := widget.NewButton("YES", func() {
             for {
                 howMany, _ = robotgo.FindIds("VATTS")
@@ -219,10 +266,11 @@ func main() {
                         myWindow.Canvas(),
                     )
                     popup.Show()
-                    time.Sleep(time.Second*3)
+                    time.Sleep(time.Second*2)
+                    server.Process.Kill()
                     os.Exit(0)
                 } else {
-                    serverIDs, _ := robotgo.FindIds("tts-server")
+                    serverIDs, _ = robotgo.FindIds("tts-server-py-bin")
                     for i := 0; i < len(serverIDs); i++ {
                         if os.Getpid() != howMany[i] {
                             TTSprocess, err := os.FindProcess(serverIDs[i])
@@ -273,7 +321,7 @@ func main() {
 
     isHidden := false
 
-	log.Append("Press Ctrl+M to toggle window minimize state", verbose)
+	log.Append("Press Ctrl+Shift+M to toggle window minimize state", verbose)
 
     go func() {
         hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
@@ -297,6 +345,7 @@ func main() {
 
     log.Append("Window show was called", verbose)
     myWindow.ShowAndRun()
+    defer server.Process.Kill()
 }
 
 func sendText(text string) {
