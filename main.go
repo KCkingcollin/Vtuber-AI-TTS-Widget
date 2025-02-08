@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -341,14 +342,24 @@ func main() {
         entry := widget.NewEntry()
         entry.SetPlaceHolder("TTS Input...")
         button := widget.NewButton(" Press to send (or just press enter) ", func() {
-            sendText(entry.Text)
+            sending := entry.Text
+            entry.SetPlaceHolder("Processing text...")
+            entry.SetText("")
+            sendText(sending)
+            entry.SetPlaceHolder("TTS Input...")
             entry.SetText("")
         })
         entry.OnSubmitted = func(text string) {
-            sendText(text)
+            sending := entry.Text
+            entry.SetPlaceHolder("Processing text...")
+            entry.SetText("")
+            sendText(sending)
+            entry.SetPlaceHolder("TTS Input...")
             entry.SetText("")
         }
-        content := container.NewVBox(entry, button)
+        text := widget.NewLabel("Press Ctrl+Shift+m to hide or unhide the window")
+        text.Alignment = fyne.TextAlignCenter
+        content := container.NewVBox(entry, button, text)
         mainWindow.SetContent(content)
         mainWindow.CenterOnScreen()
         log.Append("Set up of main window done", verbose)
@@ -393,6 +404,7 @@ func sendText(text string) {
 
 		// Wait for acknowledgment
 		response, err := bufio.NewReader(conn).ReadString('\n')
+        response = strings.Trim(response, "\n")
 		if err != nil {
 			log.Append(fmt.Sprintf("Error reading response: %e", err), true)
 			return
