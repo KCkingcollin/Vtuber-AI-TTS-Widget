@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -19,6 +18,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/KCkingcollin/Vtuber-AI-TTS-Widget/src"
 	"github.com/go-vgo/robotgo"
+	"github.com/hajimehoshi/oto/v2"
 	hook "github.com/robotn/gohook"
 )
 
@@ -393,21 +393,96 @@ func main() {
     defer server.Process.Kill()
 }
 
+func float32ToInt16(float float32) int16 {
+    // Convert float32 [-1, 1] to int16 [-32768, 32767]
+    sample := float * 32767.0
+    if sample > 32767.0 {
+        return 32767
+    }
+    if sample < -32768.0 {
+        return -32768
+    }
+    return int16(sample)
+}
+
 func sendText(text string) {
     log.Append(fmt.Sprintf("Sending text: %s", text), verbose)
-		// Send text to server
-        _, err := fmt.Fprintf(conn, "%s\n", text)
-		if err != nil {
-			log.Append(fmt.Sprintf("Error sending text: %e", err), true)
-			return
-		}
+    
+    // Send text to server
+    _, err := fmt.Fprintf(conn, "%s\n", text)
+    if err != nil {
+        log.Append(fmt.Sprintf("Error sending text: %e", err), true)
+        return
+    }
 
-		// Wait for acknowledgment
-		response, err := bufio.NewReader(conn).ReadString('\n')
-        response = strings.Trim(response, "\n")
-		if err != nil {
-			log.Append(fmt.Sprintf("Error reading response: %e", err), true)
-			return
-		}
-        log.Append(fmt.Sprintf("Server response: %s", response), verbose)
+    // Read header (sample rate, channels, and data length)
+    header := make([]byte, 12)  // 3 uint32 values
+    _, err = conn.Read(header)
+    if err != nil {
+        log.Append(fmt.Sprintf("Error reading header: %e", err), true)
+        return
+    }
+
+    // Parse header
+    var sampleRate, channels, dataLength uint32
+    headerBuf := bytes.NewReader(header)
+    if err := binary.Read(headerBuf, binary.BigEndian, &sampleRate); err != nil {
+        log.Append(fmt.Sprintf("Error parsing sample rate: %e", err), true)
+        return
+    }
+    if err := binary.Read(headerBuf, binary.BigEndian, &channels); err != nil {
+        log.Append(fmt.Sprintf("Error parsing channels: %e", err), true)
+        return
+    }
+    if err := binary.Read(headerBuf, binary.BigEndian, &dataLength); err != nil {
+        log.Append(fmt.Sprintf("Error parsing data length: %e", err), true)
+        return
+    }
+
+    log.Append(fmt.Sprintf("Receiving audio: %d Hz, %d channels, %d bytes", sampleRate, channels, dataLength), verbose)
+
+    // Read audio data
+    audioData := make([]byte, dataLength)
+    bytesRead := 0
+    for bytesRead < int(dataLength) {
+        n, err := conn.Read(audioData[bytesRead:])
+        if err != nil {
+            log.Append(fmt.Sprintf("Error reading audio data: %e", err), true)
+            return
+        }
+        bytesRead += n
+    }
+
+    // Convert float32 samples to int16 for playback
+    numSamples := len(audioData) / 4  // 4 bytes per float32
+    pcmData := make([]byte, numSamples*2)  // 2 bytes per int16
+    
+    for i := 0; i < numSamples; i++ {
+        var sample float32
+        binary.Read(bytes.NewReader(audioData[i*4:(i+1)*4]), binary.LittleEndian, &sample)
+        pcmSample := float32ToInt16(sample)
+        binary.LittleEndian.PutUint16(pcmData[i*2:(i+1)*2], uint16(pcmSample))
+    }
+
+    // Initialize audio context
+    context, readyChan, err := oto.NewContext(int(sampleRate), int(channels), 2)
+    if err != nil {
+        log.Append(fmt.Sprintf("Error creating audio context: %e", err), true)
+        return
+    }
+    <-readyChan
+
+    // Create player
+    player := context.NewPlayer(bytes.NewReader(pcmData))
+    defer player.Close()
+
+    // Play audio
+    player.Play()
+
+    // Wait for playback to complete
+    for player.IsPlaying() {
+        time.Sleep(time.Millisecond * 10)
+    }
+
+    log.Append("Audio playback completed", verbose)
 }
