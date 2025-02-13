@@ -416,7 +416,7 @@ func sendText(text string) {
     }
 
     // Read header (sample rate, channels, and data length)
-    header := make([]byte, 12)  // 3 uint32 values
+    header := make([]byte, 12)
     _, err = conn.Read(header)
     if err != nil {
         log.Append(fmt.Sprintf("Error reading header: %e", err), true)
@@ -454,8 +454,8 @@ func sendText(text string) {
     }
 
     // Convert float32 samples to int16 for playback
-    numSamples := len(audioData) / 4  // 4 bytes per float32
-    pcmData := make([]byte, numSamples*2)  // 2 bytes per int16
+    numSamples := len(audioData) / 4
+    pcmData := make([]byte, numSamples*2)
     
     for i := 0; i < numSamples; i++ {
         var sample float32
