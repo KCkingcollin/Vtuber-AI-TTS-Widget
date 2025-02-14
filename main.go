@@ -55,7 +55,20 @@ func downloadFile(url, filepath string) error {
 }
 
 func checkForDepends() {
-    _, err := os.Stat("./kokoro-tts/voices.json")
+    _, err := os.Stat("./kokoro-tts")
+    if installLock("kokoro-tts.loc") || os.IsNotExist(err) {
+        installLock("kokoro-tts.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Making folder(s)\nPlease do not close this window")
+        mainWindow.Content().Refresh()
+        err := os.Mkdir("./kokoro-tts", 0755)
+        if err != nil {
+            log.Append(fmt.Sprintf("failed to make folder: %e", err), true)
+            os.Exit(1)
+        }
+        installLock("kokoro-tts.loc", false)
+    }
+
+    _, err = os.Stat("./kokoro-tts/voices.json")
     if installLock("voices.json.loc") || os.IsNotExist(err) {
         installLock("voices.json.loc", true)
         mainWindow = textPopupWindow(mainWindow, "Downloading voices.json\nPlease do not close this window")
@@ -92,6 +105,19 @@ func checkForDepends() {
             os.Exit(1)
         }
         installLock("voice.onnx.loc", false)
+    }
+
+    _, err = os.Stat("./kokoro-tts/tts-server.py")
+    if installLock("tts-server.py.loc") || os.IsNotExist(err) {
+        installLock("tts-server.py.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Downloading tts-server.py\nPlease do not close this window")
+        mainWindow.Content().Refresh()
+        err := downloadFile("https://raw.githubusercontent.com/KCkingcollin/Vtuber-AI-TTS-Widget/refs/heads/stable/kokoro-tts/tts-server.py", "kokoro-tts/tts-server.py")
+        if err != nil {
+            log.Append(fmt.Sprintf("failed to download file: %e", err), true)
+            os.Exit(1)
+        }
+        installLock("tts-server.py.loc", false)
     }
 
     mainWindow = textPopupWindow(mainWindow, "Setting up python environment\nPlease do not close this window")
