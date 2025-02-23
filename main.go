@@ -1,15 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -54,7 +59,120 @@ func downloadFile(url, filepath string) error {
 	return nil
 }
 
+func PackageInstalled(pkg string) bool {
+    _, err := exec.LookPath(pkg)
+    if err != nil {
+        if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {
+            return false
+        }
+        log.Append(fmt.Sprint(err), verbose)
+    }
+    return true
+}
+
 func checkForDepends() {
+    // check for python version and try to install it
+    pkg := "python"
+    if installLock("python.loc") || !PackageInstalled(pkg) {
+        log.Append("python not installed", verbose)
+        if osEnv == "linux" {
+            log.Append("Please install the newest version of python", true)
+        } else if osEnv == "windows" {
+            installLock("python.loc", true)
+            mainWindow = textPopupWindow(mainWindow, "Installing Python\nPlease do not close this window")
+            mainWindow.Content().Refresh()
+            downloadFile("https://www.python.org/ftp/python/3.13.2/python-3.13.2-amd64.exe", "./python-3.13.2-amd64.exe")
+            cmd := exec.Command("./python-3.13.2-amd64.exe")
+            err := cmd.Run()
+            if err != nil {
+                log.Append(fmt.Sprint("Problem Installing python", err), true)
+                os.Exit(1)
+            } else {
+                log.Append(fmt.Sprintf("Package %s installed\n", pkg), verbose)
+                installLock("python.loc", false)
+            }
+        }
+    } else if PackageInstalled(pkg) {
+        log.Append(fmt.Sprintf("Package %s already installed\n", pkg), verbose)
+        cmd := exec.Command("python", "--version")
+        out, err := cmd.Output()
+        if err != nil {
+            log.Append(fmt.Sprint(err), verbose)
+        }
+        strIn := string(out)
+        re := regexp.MustCompile("[0-9]+")
+        nums := re.FindAllString(strIn, -1)
+        var major, minor1, minor2 int
+        if len(nums) >= 3 {
+            major, _ = strconv.Atoi(nums[0])
+            minor1, _ = strconv.Atoi(nums[1])
+            minor2, _ = strconv.Atoi(nums[2])
+        }
+        v1 := []float64{float64(major), float64(minor1), float64(minor2)}
+        v2 := []float64{3, 13, 1}
+        version := math.Sqrt(v1[0]*v1[0] + v1[1]*v1[1] + v1[2]*v1[2])
+        requiredVer := math.Sqrt(v2[0]*v2[0] + v2[1]*v2[1] + v2[2]*v2[2])
+        if version < requiredVer {
+            log.Append("version too low", verbose)
+            if osEnv == "linux" {
+                log.Append("Please install the newest version of python", true)
+            } else if osEnv == "windows" {
+                installLock("python.loc", true)
+                mainWindow = textPopupWindow(mainWindow, "Installing Python\nPlease do not close this window")
+                mainWindow.Content().Refresh()
+                downloadFile("https://www.python.org/ftp/python/3.13.2/python-3.13.2-amd64.exe", "./python-3.13.2-amd64.exe")
+                cmd := exec.Command("./python-3.13.2-amd64.exe")
+                err := cmd.Run()
+                if err != nil {
+                    log.Append(fmt.Sprint("Problem Installing python", err), true)
+                    os.Exit(1)
+                } else {
+                    log.Append(fmt.Sprintf("Package %s installed\n", pkg), verbose)
+                    installLock("python.loc", false)
+                }
+            }
+        }
+    }
+
+    // check for vs runtime 2015 and try to install it
+    if osEnv == "windows" {
+        pkg = "VS Runtime 2015"
+        cmd := exec.Command("wmic", "product get name,version")
+        out, err := cmd.Output()
+        if err != nil {
+            log.Append(fmt.Sprint(err), verbose)
+        }
+        var isInstalled bool
+        reader := bufio.NewReader(bytes.NewReader(out))
+        for {
+            line, _, err := reader.ReadLine()
+            if err != nil {
+                break
+            }
+            if strings.Contains(string(line), "Redistributable") && strings.Contains(string(line), "2015"){
+                isInstalled = true
+                log.Append(fmt.Sprintf("Package %s already installed\n", pkg), verbose)
+                break
+            }
+        }
+        if !isInstalled || installLock("VS-Runtime.loc") {
+            log.Append("VS Runtime not installed", verbose)
+            installLock("VS-Runtime.loc", true)
+            mainWindow = textPopupWindow(mainWindow, "Installing VS Runtime\nPlease do not close this window")
+            mainWindow.Content().Refresh()
+            downloadFile("https://download.microsoft.com/download/9/3/f/93fcf1e7-e6a4-478b-96e7-d4b285925b00/vc_redist.x64.exe", "vc_redist.x64.exe")
+            cmd := exec.Command("./vc_redist.x64.exe")
+            err := cmd.Run()
+            if err != nil {
+                log.Append(fmt.Sprint("Problem Installing VS Runtime", err), true)
+                os.Exit(1)
+            } else {
+                log.Append(fmt.Sprintf("Package %s installed\n", pkg), verbose)
+                installLock("VS-Runtime.loc", false)
+            }
+        }
+    }
+
     _, err := os.Stat("./kokoro-tts")
     if installLock("kokoro-tts.loc") || os.IsNotExist(err) {
         installLock("kokoro-tts.loc", true)
