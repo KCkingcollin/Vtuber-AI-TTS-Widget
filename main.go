@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -92,8 +91,7 @@ func checkForDepends() {
             cmd := exec.Command("./python-3.13.2-amd64.exe")
             err := cmd.Run()
             if err != nil {
-                log.Append(fmt.Sprint("Problem Installing python", err), true)
-                os.Exit(1)
+                log.Append(fmt.Sprint("Problem Installing python", err), verbose)
             } else {
                 log.Append(fmt.Sprintf("Package %s installed\n", pkg), verbose)
                 installLock("python.loc", false)
@@ -103,53 +101,53 @@ func checkForDepends() {
         log.Append(fmt.Sprintf("Package %s already installed\n", pkg), verbose)
     }
 
-    // check for vs runtime 2015 and try to install it
-    if osEnv == "windows" {
-        pkg = "Dotnet Runtime"
-        cmd := exec.Command("dotnet", "--list-runtimes")
-        out, err := cmd.Output()
-        if err != nil {
-            log.Append(fmt.Sprint("dotnet version command error: ", err), verbose)
-            os.Exit(1)
-        }
-        log.Append("Dotnet Runtime version(s) installed: \n" + string(out), verbose)
-        var isInstalled bool
-        reader := bufio.NewReader(bytes.NewReader(out))
-        for {
-            line, _, err := reader.ReadLine()
-            if err != nil {
-                log.Append(fmt.Sprint("readline error: ", err), verbose)
-                break
-            }
-            strIn := string(line)
-            re := regexp.MustCompile("[0-9]+")
-            nums := re.FindAllString(strIn, -1)
-            version, _ := strconv.Atoi(nums[0])
-            if version >= 8 {
-                isInstalled = true
-                log.Append(fmt.Sprintf("Package %s already installed\n", pkg), verbose)
-                break
-            }
-        }
-        if !isInstalled || installLock("Dotnet-Runtime.loc") {
-            log.Append("Dotnet Runtime not installed", verbose)
-            installLock("Dotnet-Runtime.loc", true)
-            mainWindow = textPopupWindow(mainWindow, "Installing Dotnet Runtime\nPlease do not close this window")
-            mainWindow.Content().Refresh()
-            downloadFile("https://download.visualstudio.microsoft.com/download/pr/fc8c9dea-8180-4dad-bf1b-5f229cf47477/c3f0536639ab40f1470b6bad5e1b95b8/windowsdesktop-runtime-8.0.13-win-x64.exe", "windowsdesktop-runtime-8.0.13-win-x64.exe")
-            cmd := exec.Command("./windowsdesktop-runtime-8.0.13-win-x64.exe")
-            err := cmd.Run()
-            if err != nil {
-                log.Append(fmt.Sprint("Problem Installing Dotnet Runtime", err), true)
-                os.Exit(1)
-            } else {
-                log.Append(fmt.Sprintf("Package %s installed\n", pkg), verbose)
-                installLock("Dotnet-Runtime.loc", false)
-            }
-        } else {
-            log.Append(fmt.Sprintf("Package %s already installed\n", pkg), verbose)
-        }
-    }
+    // // check for vs runtime 2015 and try to install it
+    // if osEnv == "windows" {
+    //     pkg = "Dotnet Runtime"
+    //     cmd := exec.Command("dotnet", "--list-runtimes")
+    //     out, err := cmd.Output()
+    //     if err != nil {
+    //         log.Append(fmt.Sprint("dotnet version command error: ", err), verbose)
+    //         os.Exit(1)
+    //     }
+    //     log.Append("Dotnet Runtime version(s) installed: \n" + string(out), verbose)
+    //     var isInstalled bool
+    //     reader := bufio.NewReader(bytes.NewReader(out))
+    //     for {
+    //         line, _, err := reader.ReadLine()
+    //         if err != nil {
+    //             log.Append(fmt.Sprint("readline error: ", err), verbose)
+    //             break
+    //         }
+    //         strIn := string(line)
+    //         re := regexp.MustCompile("[0-9]+")
+    //         nums := re.FindAllString(strIn, -1)
+    //         version, _ := strconv.Atoi(nums[0])
+    //         if version >= 8 {
+    //             isInstalled = true
+    //             log.Append(fmt.Sprintf("Package %s already installed\n", pkg), verbose)
+    //             break
+    //         }
+    //     }
+    //     if !isInstalled || installLock("Dotnet-Runtime.loc") {
+    //         log.Append("Dotnet Runtime not installed", verbose)
+    //         installLock("Dotnet-Runtime.loc", true)
+    //         mainWindow = textPopupWindow(mainWindow, "Installing Dotnet Runtime\nPlease do not close this window")
+    //         mainWindow.Content().Refresh()
+    //         downloadFile("https://download.visualstudio.microsoft.com/download/pr/fc8c9dea-8180-4dad-bf1b-5f229cf47477/c3f0536639ab40f1470b6bad5e1b95b8/windowsdesktop-runtime-8.0.13-win-x64.exe", "windowsdesktop-runtime-8.0.13-win-x64.exe")
+    //         cmd := exec.Command("./windowsdesktop-runtime-8.0.13-win-x64.exe")
+    //         err := cmd.Run()
+    //         if err != nil {
+    //             log.Append(fmt.Sprint("Problem Installing Dotnet Runtime", err), true)
+    //             os.Exit(1)
+    //         } else {
+    //             log.Append(fmt.Sprintf("Package %s installed\n", pkg), verbose)
+    //             installLock("Dotnet-Runtime.loc", false)
+    //         }
+    //     } else {
+    //         log.Append(fmt.Sprintf("Package %s already installed\n", pkg), verbose)
+    //     }
+    // }
 
     _, err = os.Stat("./kokoro-tts")
     if installLock("kokoro-tts.loc") || os.IsNotExist(err) {
