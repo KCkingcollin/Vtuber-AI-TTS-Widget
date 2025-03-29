@@ -325,7 +325,7 @@ func main() {
                 os.Exit(1)
             }
         } else if osEnv == "windows" {
-            server = exec.Command("./kokoro-tts/tts-server.exe")
+            server = exec.Command("./kokoro-tts/tts-server-win.exe")
             err := server.Start()
             if err != nil {
                 log.Append(fmt.Sprintf("failed to run server: %e", err), true)
