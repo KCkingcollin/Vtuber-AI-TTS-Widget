@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -27,6 +28,10 @@ var conn net.Conn
 var osEnv string
 var mainApp fyne.App
 var mainWindow fyne.Window
+
+type keyBind struct {
+    keybinging []string
+}
 
 func downloadFile(url, filepath string) error {
 	resp, err := http.Get(url)
@@ -55,54 +60,6 @@ func downloadFile(url, filepath string) error {
 }
 
 func checkForDepends() {
-    // // check for python version and try to install it
-    // pkg := "python"
-    // cmd := exec.Command("python", "--version")
-    // out, err := cmd.Output()
-    // if err != nil {
-    //     log.Append(fmt.Sprint("Python version command error: ", err), verbose)
-    // }
-    // log.Append("Python version installed: \n" + string(out), verbose)
-    // strIn := string(out)
-    // re := regexp.MustCompile("[0-9]+")
-    // nums := re.FindAllString(strIn, -1)
-    // var major, minor1, minor2 int
-    // if len(nums) >= 3 {
-    //     major, _ = strconv.Atoi(nums[0])
-    //     minor1, _ = strconv.Atoi(nums[1])
-    //     minor2, _ = strconv.Atoi(nums[2])
-    // }
-    // v1 := []float64{float64(major), float64(minor1), float64(minor2)}
-    // v2 := []float64{3, 13, 1}
-    // version := math.Sqrt(v1[0]*v1[0] + v1[1]*v1[1] + v1[2]*v1[2])
-    // requiredVer := math.Sqrt(v2[0]*v2[0] + v2[1]*v2[1] + v2[2]*v2[2])
-    // if version < requiredVer || installLock("python.loc") {
-    //     log.Append("Installing Python", verbose)
-    //     if osEnv == "linux" {
-    //         log.Append("Please install the newest version of python", true)
-    //     } else if osEnv == "windows" {
-    //         installLock("python.loc", true)
-    //         mainWindow = textPopupWindow(mainWindow, "Installing Python\nPlease do not close this window")
-    //         mainWindow.Content().Refresh()
-    //         downloadFile("https://www.python.org/ftp/python/3.13.2/python-3.13.2-amd64.exe", "./python-3.13.2-amd64.exe")
-    //         cmd := exec.Command("./python-3.13.2-amd64.exe")
-    //         err := cmd.Run()
-    //         if err != nil {
-    //             log.Append(fmt.Sprint("Problem Installing python", err), true)
-    //             os.Exit(1)
-    //         } else {
-    //             log.Append(fmt.Sprintf("Package %s installed\n", pkg), verbose)
-    //             installLock("python.loc", false)
-    //         }
-    //         mainWindow = textPopupWindow(mainWindow, "Python is installed\nPlease restart VATTS to finish installation")
-    //         mainWindow.Content().Refresh()
-    //         time.Sleep(time.Second * 3)
-    //         os.Exit(0)
-    //     }
-    // } else {
-    //     log.Append(fmt.Sprintf("Package %s already installed\n", pkg), verbose)
-    // }
-
     _, err := os.Stat("./kokoro-tts")
     if installLock("kokoro-tts.loc") || os.IsNotExist(err) {
         installLock("kokoro-tts.loc", true)
@@ -114,6 +71,17 @@ func checkForDepends() {
             os.Exit(1)
         }
         installLock("kokoro-tts.loc", false)
+    }
+
+    _, err = os.Stat("./config/keybinds.json")
+    if installLock("keybinds.json.loc") || os.IsNotExist(err) {
+        installLock("keybinds.json.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Making keybinds.json\nPlease do not close this window")
+        mainWindow.Content().Refresh()
+        defaults := keyBind{keybinging: []string{"alt", "shift", "t"}}
+        file, _ := json.MarshalIndent(defaults, "", " ")
+        _ = os.WriteFile("keybinds.json", file, 0644)
+        installLock("keybinds.json.loc", false)
     }
 
     _, err = os.Stat("./kokoro-tts/voices.json")
@@ -128,7 +96,6 @@ func checkForDepends() {
         }
         installLock("voices.json.loc", false)
     }
-
     _, err = os.Stat("./kokoro-tts/voices.bin")
     if installLock("voices.bin.loc") || os.IsNotExist(err) {
         installLock("voices.bin.loc", true)
@@ -154,116 +121,6 @@ func checkForDepends() {
         }
         installLock("voice.onnx.loc", false)
     }
-
-    // _, err = os.Stat("./kokoro-tts/tts-server.py")
-    // if installLock("tts-server.py.loc") || os.IsNotExist(err) {
-    //     installLock("tts-server.py.loc", true)
-    //     mainWindow = textPopupWindow(mainWindow, "Downloading tts-server.py\nPlease do not close this window")
-    //     mainWindow.Content().Refresh()
-    //     err := downloadFile("https://raw.githubusercontent.com/KCkingcollin/Vtuber-AI-TTS-Widget/refs/heads/stable/kokoro-tts/tts-server.py", "kokoro-tts/tts-server.py")
-    //     if err != nil {
-    //         log.Append(fmt.Sprintf("failed to download file: %e", err), true)
-    //         os.Exit(1)
-    //     }
-    //     installLock("tts-server.py.loc", false)
-    // }
-
-    // mainWindow = textPopupWindow(mainWindow, "Setting up python environment\nPlease do not close this window")
-    // mainWindow.Content().Refresh()
-    //
-    // if osEnv == "linux" {
-    //     _, err = os.Stat("kokoro-tts/venv/bin/tts-server-py-bin")
-    // } else if osEnv == "windows" {
-    //     _, err = os.Stat("kokoro-tts/venv/Scripts/tts-server-py-bin.exe")
-    // } else { 
-    //     log.Append("os not supported", verbose)
-    //     os.Exit(1)
-    // }
-    //
-    // venvInstall := os.IsNotExist(err) 
-    //
-    // if installLock("pipvenv.loc") || venvInstall {
-    //     installLock("pipvenv.loc", true)
-    //     cmd := exec.Command("python", "-m", "venv", "kokoro-tts/venv")
-    //
-    //     var out bytes.Buffer
-    //     cmd.Stdout = &out
-    //     cmd.Stderr = &out
-    //
-    //     err := cmd.Run()
-    //     if err != nil {
-    //         log.Append(fmt.Sprintf("failed to run command: %e", err), true)
-    //         os.Exit(1)
-    //     }
-    //
-    //     log.Append(fmt.Sprintf("Command output: %s", out.String()), verbose)
-    //
-    //     var sourceFile string
-    //     var destFile string
-    //     if osEnv == "linux" {
-    //         sourceFile = "kokoro-tts/venv/bin/python"
-    //         destFile = "kokoro-tts/venv/bin/tts-server-py-bin"
-    //     } else if osEnv == "windows" {
-    //         sourceFile = "kokoro-tts/venv/Scripts/pythonw.exe"
-    //         destFile = "kokoro-tts/venv/Scripts/tts-server-py-bin.exe"
-    //     } else { 
-    //         log.Append("os not supported", true)
-    //         os.Exit(1)
-    //     }
-    //
-    //     from, err := os.Open(sourceFile)
-    //     if err != nil {
-    //         error := fmt.Sprint(err)
-    //         log.Append(error, true)
-    //     }
-    //     defer from.Close()
-    //
-    //     to, err := os.OpenFile(destFile, os.O_RDWR|os.O_CREATE, 0755)
-    //     if err != nil {
-    //         error := fmt.Sprint(err)
-    //         log.Append(error, true)
-    //     }
-    //     defer to.Close()
-    //
-    //     _, err = io.Copy(to, from)
-    //     if err != nil {
-    //         error := fmt.Sprint(err)
-    //         log.Append(error, true)
-    //     }
-    //     installLock("pipvenv.loc", false)
-    //     time.Sleep(time.Second)
-    // }
-    //
-    // if installLock("pipdepend.loc") || venvInstall {
-    //     installLock("pipdepend.loc", true)
-    //     mainWindow = textPopupWindow(mainWindow, "Installing python dependencies\nThis could take a while, do not close this or the terminal window")
-    //     mainWindow.Content().Refresh()
-    //
-    //     var cmd *exec.Cmd
-    //     if osEnv == "linux" {
-    //         cmd = exec.Command("kokoro-tts/venv/bin/pip", "install", "onnxruntime", "kokoro_onnx", "sounddevice", "numpy", "psutil")
-    //     } else if osEnv == "windows" {
-    //         cmd = exec.Command("kokoro-tts/venv/Scripts/pip.exe", "install", "onnxruntime", "kokoro_onnx", "sounddevice", "numpy", "psutil")
-    //     } else { 
-    //         err := fmt.Errorf("os not supported")
-    //         log.Append(fmt.Sprint(err), verbose)
-    //         panic(err)
-    //     }
-    //
-    //     var out bytes.Buffer
-    //     cmd.Stdout = &out
-    //     cmd.Stderr = &out
-    //
-    //     err = cmd.Run()
-    //     if err != nil {
-    //         log.Append(fmt.Sprintf("failed to run command: %e", err), verbose)
-    //         os.Exit(1)
-    //     }
-    //
-    //     log.Append(fmt.Sprintf("Command output:%s", out.String()), verbose)
-    //     installLock("pipdepend.loc", false)
-    //     time.Sleep(time.Second*5)
-    // }
 }
 
 func textPopupWindow(textWindow fyne.Window, text string) fyne.Window {
@@ -305,27 +162,43 @@ func main() {
     mainApp = app.New()
     mainWindow = mainApp.NewWindow("VATTS")
 
+    osEnv = runtime.GOOS
+    log.Append(fmt.Sprintf("Operating system: %s", osEnv), verbose)
+
+    log.Append("Checking for dependencies", verbose)
+    checkForDepends()
+    log.Append("Dependencies installed", verbose)
+
+    mainWindow = textPopupWindow(mainWindow, "Loading Configs")
+    mainWindow.Content().Refresh()
+    jsonFile, err := os.Open("employee.json")
+    if err != nil {
+        log.Append(fmt.Sprintf("failed to load config file: %e", err), true)
+        os.Exit(1)
+    }
+    fmt.Println("Successfully Opened json file")
+    defer jsonFile.Close()
+
+    byteEmpValue, _ := io.ReadAll(jsonFile)
+
+    var config keyBind
+
+    json.Unmarshal(byteEmpValue, &config)
+
     var server *exec.Cmd
     go func() {
-        osEnv = runtime.GOOS
-        log.Append(fmt.Sprintf("Operating system: %s", osEnv), verbose)
-
-        // log.Append("Checking for dependencies", verbose)
-        // checkForDepends()
-        // log.Append("Dependencies installed", verbose)
-
         mainWindow = textPopupWindow(mainWindow, "Starting TTS engine")
         mainWindow.Content().Refresh()
         log.Append("Starting server", verbose)
         if osEnv == "linux" {
-            server = exec.Command("./kokoro-tts/tts-server")
+            server = exec.Command("./tts-server")
             err := server.Start()
             if err != nil {
                 log.Append(fmt.Sprintf("failed to run server: %e", err), true)
                 os.Exit(1)
             }
         } else if osEnv == "windows" {
-            server = exec.Command("./kokoro-tts/tts-server-win.exe")
+            server = exec.Command("./tts-server-win.exe")
             err := server.Start()
             if err != nil {
                 log.Append(fmt.Sprintf("failed to run server: %e", err), true)
@@ -339,7 +212,6 @@ func main() {
         log.Append("Server started", verbose)
 
         log.Append("Connecting to TTS server", verbose)
-        var err error
         conn, err = net.Dial("tcp", "127.0.0.1:65432")
         for i := 0; err != nil; i++ {
             time.Sleep(time.Second)
@@ -431,7 +303,7 @@ func main() {
             entry.SetPlaceHolder("TTS Input...")
             entry.SetText("")
         }
-        text := widget.NewLabel("Press Ctrl+Shift+m to hide or unhide the window")
+        text := widget.NewLabel("Press " + config.keybinging[0] + " " + config.keybinging[1] + " " + config.keybinging[2] + " " + " to hide or unhide the window")
         text.Alignment = fyne.TextAlignCenter
         content := container.NewVBox(entry, button, text)
         mainWindow.SetContent(content)
@@ -442,7 +314,7 @@ func main() {
         log.Append("Key hook started", verbose)
         isHidden := false
         go func() {
-            hook.Register(hook.KeyDown, []string{"ctrl", "shift", "m"}, func(e hook.Event) {
+            hook.Register(hook.KeyDown, config.keybinging, func(e hook.Event) {
                 if isHidden {
                     mainWindow.Show()
                     mainWindow.RequestFocus()
@@ -461,7 +333,7 @@ func main() {
     }()
 
     log.Append("Window show and run called", verbose)
-    log.Append("Press Ctrl+Shift+M to toggle window minimize state", true)
+    log.Append("Press " + config.keybinging[0] + " " + config.keybinging[1] + " " + config.keybinging[2] + " " + " to toggle window minimize state", true)
     mainWindow.ShowAndRun()
     defer conn.Close()
     defer server.Process.Kill()
