@@ -15,3 +15,8 @@ If you'd like to build the app then you'll need python 3.13 and GO, you can use 
 https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json
 https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin
 https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx
+
+After building the python exe you'll need to run ```go mod tidy``` to get all the modules that are required to build it. Then if you're on linux simply run ```go build -v -o VATTS main.go```, however if you are on windows then you are SOL, you will need to use wsl2 or set up a Linux environment so you can compile it there, I do not know why, but it seems to be far more difficult to build the GO windows exe in windows as crazy as that sounds, anyway,  once you're in a Linux environment you'll need to run ```GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc go build -v -ldflags="-H windowsgui" -o VATTS.exe```, you will obviously need go in the Linux environment, but not as obvious you'll also need mingw-gcc
+
+Finally, just put all the exes and necessary files in the right folders, the python exe and its `_internal` folder will be in the `kokoro/dist` folder, so move both them into the project root or where ever `VATTS` will be. You don't reall need the kokoro folder in the final project, VATTS will download what it needs as long as it at least has the server exe, the internal folder, and itself.
+
