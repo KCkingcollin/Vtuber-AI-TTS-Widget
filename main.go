@@ -29,8 +29,12 @@ var osEnv string
 var mainApp fyne.App
 var mainWindow fyne.Window
 
-type keyBind struct {
-    keybinging []string
+type KeyBind struct {
+    HideBind  []string `json:"Window hide binding"`
+}
+
+type Config struct {
+    Keybinding KeyBind `json:"Keybindings"`
 }
 
 func downloadFile(url, filepath string) error {
@@ -73,15 +77,33 @@ func checkForDepends() {
         installLock("kokoro-tts.loc", false)
     }
 
-    _, err = os.Stat("./config/keybinds.json")
-    if installLock("keybinds.json.loc") || os.IsNotExist(err) {
-        installLock("keybinds.json.loc", true)
-        mainWindow = textPopupWindow(mainWindow, "Making keybinds.json\nPlease do not close this window")
+    _, err = os.Stat("./config")
+    if installLock("config.loc") || os.IsNotExist(err) {
+        installLock("config.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Making folder(s)\nPlease do not close this window")
         mainWindow.Content().Refresh()
-        defaults := keyBind{keybinging: []string{"alt", "shift", "t"}}
-        file, _ := json.MarshalIndent(defaults, "", " ")
-        _ = os.WriteFile("keybinds.json", file, 0644)
-        installLock("keybinds.json.loc", false)
+        err := os.Mkdir("./config", 0755)
+        if err != nil {
+            log.Append(fmt.Sprintf("failed to make folder: %e", err), true)
+            os.Exit(1)
+        }
+        installLock("config.loc", false)
+    }
+
+    _, err = os.Stat("./config/settings.json")
+    if installLock("settings.json.loc") || os.IsNotExist(err) {
+        installLock("settings.json.loc", true)
+        mainWindow = textPopupWindow(mainWindow, "Making settings.json\nPlease do not close this window")
+        mainWindow.Content().Refresh()
+        file, err := json.MarshalIndent(Config{
+            Keybinding: KeyBind{HideBind: []string{"alt", "shift", "t"}}, 
+        }, "", " ")
+        if err != nil {
+            log.Append(fmt.Sprintf("failed to write json file: %e", err), true)
+            os.Exit(1)
+        }
+        _ = os.WriteFile("./config/settings.json", file, 0644)
+        installLock("settings.json.loc", false)
     }
 
     _, err = os.Stat("./kokoro-tts/voices.json")
@@ -162,31 +184,35 @@ func main() {
     mainApp = app.New()
     mainWindow = mainApp.NewWindow("VATTS")
 
-    osEnv = runtime.GOOS
-    log.Append(fmt.Sprintf("Operating system: %s", osEnv), verbose)
-
-    log.Append("Checking for dependencies", verbose)
-    checkForDepends()
-    log.Append("Dependencies installed", verbose)
-
-    mainWindow = textPopupWindow(mainWindow, "Loading Configs")
-    mainWindow.Content().Refresh()
-    jsonFile, err := os.Open("employee.json")
-    if err != nil {
-        log.Append(fmt.Sprintf("failed to load config file: %e", err), true)
-        os.Exit(1)
-    }
-    fmt.Println("Successfully Opened json file")
-    defer jsonFile.Close()
-
-    byteEmpValue, _ := io.ReadAll(jsonFile)
-
-    var config keyBind
-
-    json.Unmarshal(byteEmpValue, &config)
-
+    var config Config
     var server *exec.Cmd
+    var jsonFile *os.File
     go func() {
+        osEnv = runtime.GOOS
+        log.Append(fmt.Sprintf("Operating system: %s", osEnv), verbose)
+
+        log.Append("Checking for dependencies", verbose)
+        checkForDepends()
+        log.Append("Dependencies installed", verbose)
+
+        mainWindow = textPopupWindow(mainWindow, "Loading Configs")
+        mainWindow.Content().Refresh()
+        jsonFile, err := os.Open("./config/settings.json")
+        if err != nil {
+            log.Append(fmt.Sprintf("failed to open config file: %e", err), true)
+            os.Exit(1)
+        }
+        byteEmpValue, err := io.ReadAll(jsonFile)
+        if err != nil {
+            log.Append(fmt.Sprintf("failed to read config file: %e", err), true)
+            os.Exit(1)
+        }
+        json.Unmarshal(byteEmpValue, &config)
+
+        log.Append("Successfully Opened json file", verbose)
+        log.Append(fmt.Sprint("Config file: ", config), verbose)
+
+
         mainWindow = textPopupWindow(mainWindow, "Starting TTS engine")
         mainWindow.Content().Refresh()
         log.Append("Starting server", verbose)
@@ -249,7 +275,7 @@ func main() {
                         os.Exit(0)
                     } else {
                         serverIDs, _ = robotgo.FindIds("tts-server")
-                        for i := 0; i < len(serverIDs); i++ {
+                        for i := range len(serverIDs) {
                             if os.Getpid() != howMany[i] {
                                 TTSprocess, err := os.FindProcess(serverIDs[i])
                                 if err != nil {
@@ -259,7 +285,7 @@ func main() {
                             }
                         }
                         howMany, _ = robotgo.FindIds("VATTS")
-                        for i := 0; i < len(howMany); i++ {
+                        for i := range len(howMany) {
                             if os.Getpid() != howMany[i] {
                                 GUIprocess, err := os.FindProcess(howMany[i])
                                 if err != nil {
@@ -303,7 +329,7 @@ func main() {
             entry.SetPlaceHolder("TTS Input...")
             entry.SetText("")
         }
-        text := widget.NewLabel("Press " + config.keybinging[0] + " " + config.keybinging[1] + " " + config.keybinging[2] + " " + " to hide or unhide the window")
+        text := widget.NewLabel("Press " + fmt.Sprint(config.Keybinding.HideBind) + " to hide or unhide the window")
         text.Alignment = fyne.TextAlignCenter
         content := container.NewVBox(entry, button, text)
         mainWindow.SetContent(content)
@@ -314,7 +340,7 @@ func main() {
         log.Append("Key hook started", verbose)
         isHidden := false
         go func() {
-            hook.Register(hook.KeyDown, config.keybinging, func(e hook.Event) {
+            hook.Register(hook.KeyDown, config.Keybinding.HideBind, func(e hook.Event) {
                 if isHidden {
                     mainWindow.Show()
                     mainWindow.RequestFocus()
@@ -330,11 +356,12 @@ func main() {
             s := hook.Start()
             <-hook.Process(s)
         }()
+        log.Append("Press " + fmt.Sprint(config.Keybinding.HideBind) + " to toggle window minimize state", true)
     }()
 
     log.Append("Window show and run called", verbose)
-    log.Append("Press " + config.keybinging[0] + " " + config.keybinging[1] + " " + config.keybinging[2] + " " + " to toggle window minimize state", true)
     mainWindow.ShowAndRun()
+    defer jsonFile.Close()
     defer conn.Close()
     defer server.Process.Kill()
 }
@@ -403,7 +430,7 @@ func sendText(text string) {
     numSamples := len(audioData) / 4
     pcmData := make([]byte, numSamples*2)
     
-    for i := 0; i < numSamples; i++ {
+    for i := range numSamples {
         var sample float32
         binary.Read(bytes.NewReader(audioData[i*4:(i+1)*4]), binary.LittleEndian, &sample)
         pcmSample := float32ToInt16(sample)
