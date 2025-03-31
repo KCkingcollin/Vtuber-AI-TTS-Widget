@@ -93,13 +93,12 @@ def process_audio_batch(samples, sample_rate):
 
 
 # Modified to return audio data instead of playing it
-def process_text(kokoro, text):
-    start_time = time.time()
-
+def process_text(kokoro, text, voice):
     # Generate audio
+    # voice = kokoro.get_voice_style(voice)
     samples, sample_rate = kokoro.create(
         text,
-        voice="af_sky",
+        voice=voice,
         speed=1.3,
         lang="en-us",
     )
@@ -109,9 +108,6 @@ def process_text(kokoro, text):
         processed_samples = executor.submit(
             process_audio_batch, samples, sample_rate
         ).result()
-
-    generation_time = time.time() - start_time
-    print(f"Generation time: {generation_time:.2f} seconds | Text: '{text}'")
 
     # Keep as 32-bit float
     return processed_samples, sample_rate
@@ -127,11 +123,13 @@ def handle_client(conn, kokoro):
                     break
                 buffer += data
                 while '\n' in buffer:
+                    voice, buffer = buffer.split('\n', 1)
                     text, buffer = buffer.split('\n', 1)
+                    voice = voice.strip()
                     text = text.strip()
                     if text:
                         # Generate audio and send it back
-                        audio_data, sample_rate = process_text(kokoro, text)
+                        audio_data, sample_rate = process_text(kokoro, text, voice)
 
                         # Convert numpy array to bytes while preserving 32-bit float precision
                         audio_bytes = audio_data.astype(np.float32).tobytes()

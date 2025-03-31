@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -23,11 +24,14 @@ import (
 	hook "github.com/robotn/gohook"
 )
 
-var verbose bool
-var conn net.Conn
-var osEnv string
-var mainApp fyne.App
-var mainWindow fyne.Window
+var (
+    verbose         bool
+    debugging       bool
+    conn            net.Conn
+    osEnv           string
+    mainApp         fyne.App
+    mainWindow      fyne.Window
+)
 
 type KeyBind struct {
     HideBind  []string `json:"Window hide binding"`
@@ -123,7 +127,7 @@ func checkForDepends() {
         installLock("voices.bin.loc", true)
         mainWindow = textPopupWindow(mainWindow, "Downloading voices.bin\nPlease do not close this window")
         mainWindow.Content().Refresh()
-        err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin", "kokoro-tts/voices.bin")
+        err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin", "kokoro-tts/voices.bin")
         if err != nil {
             log.Append(fmt.Sprintf("failed to download file: %e", err), true)
             os.Exit(1)
@@ -136,7 +140,7 @@ func checkForDepends() {
         installLock("voice.onnx.loc", true)
         mainWindow = textPopupWindow(mainWindow, "Downloading voice.onnx\nPlease do not close this window")
         mainWindow.Content().Refresh()
-        err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx", "kokoro-tts/voice.onnx")
+        err := downloadFile("https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx", "kokoro-tts/voice.onnx")
         if err != nil {
             log.Append(fmt.Sprintf("failed to download file: %e", err), true)
             os.Exit(1)
@@ -172,9 +176,12 @@ func installLock(name string, enable ...bool) bool {
 }
 
 func main() {
-    if len(os.Args) > 1 {
-        if os.Args[1] == "-v" || os.Args[1] == "--verbose" {
+    for _, arg := range os.Args {
+        if arg == "-v" || arg == "--verbose" {
             verbose = true
+        }
+        if arg == "-d" || arg == "--debugging" {
+            debugging = true
         }
     }
     if err := log.Init("./", "main.log", 1); err != nil {
@@ -213,38 +220,46 @@ func main() {
         log.Append(fmt.Sprint("Config file: ", config), verbose)
 
 
-        mainWindow = textPopupWindow(mainWindow, "Starting TTS engine")
-        mainWindow.Content().Refresh()
-        log.Append("Starting server", verbose)
-        if osEnv == "linux" {
-            server = exec.Command("./tts-server")
-            err := server.Start()
-            if err != nil {
-                log.Append(fmt.Sprintf("failed to run server: %e", err), true)
+        if !debugging {
+            mainWindow = textPopupWindow(mainWindow, "Starting TTS engine")
+            mainWindow.Content().Refresh()
+            log.Append("Starting server", verbose)
+            if osEnv == "linux" {
+                server = exec.Command("./tts-server")
+                err := server.Start()
+                if err != nil {
+                    log.Append(fmt.Sprintf("failed to run server: %e", err), true)
+                    os.Exit(1)
+                }
+            } else if osEnv == "windows" {
+                server = exec.Command("./tts-server-win.exe")
+                err := server.Start()
+                if err != nil {
+                    log.Append(fmt.Sprintf("failed to run server: %e", err), true)
+                    os.Exit(1)
+                }
+            } else {
+                err := fmt.Errorf("os not supported")
+                log.Append(fmt.Sprint(err), true)
                 os.Exit(1)
             }
-        } else if osEnv == "windows" {
-            server = exec.Command("./tts-server-win.exe")
-            err := server.Start()
-            if err != nil {
-                log.Append(fmt.Sprintf("failed to run server: %e", err), true)
-                os.Exit(1)
-            }
+            log.Append("Server started", verbose)
         } else {
-            err := fmt.Errorf("os not supported")
-            log.Append(fmt.Sprint(err), true)
-            os.Exit(1)
+            mainWindow = textPopupWindow(mainWindow, "Debugging mode on. Start server manually")
+            mainWindow.Content().Refresh()
+            log.Append("Debugging mode on", verbose)
         }
-        log.Append("Server started", verbose)
 
         log.Append("Connecting to TTS server", verbose)
         conn, err = net.Dial("tcp", "127.0.0.1:65432")
         for i := 0; err != nil; i++ {
             time.Sleep(time.Second)
             conn, err = net.Dial("tcp", "127.0.0.1:65432")
-            if i >= 30 {
-                log.Append(fmt.Sprintf("Error connecting: %e", err), true)
-                os.Exit(1)
+            if !debugging {
+                if i >= 30 {
+                    log.Append(fmt.Sprintf("Error connecting: %e", err), true)
+                    os.Exit(1)
+                }
             }
         }
         log.Append("Connected to TTS server", verbose)
@@ -322,12 +337,15 @@ func main() {
             entry.SetText("")
         })
         entry.OnSubmitted = func(text string) {
-            sending := entry.Text
-            entry.SetPlaceHolder("Processing text...")
-            entry.SetText("")
-            sendText(sending)
-            entry.SetPlaceHolder("TTS Input...")
-            entry.SetText("")
+            entry.Text = strings.TrimSpace(entry.Text)
+            if entry.Text != "" {
+                sending := "af_heart\n" + entry.Text
+                entry.SetPlaceHolder("Processing text...")
+                entry.SetText("")
+                sendText(sending)
+                entry.SetPlaceHolder("TTS Input...")
+                entry.SetText("")
+            }
         }
         text := widget.NewLabel("Press " + fmt.Sprint(config.Keybinding.HideBind) + " to hide or unhide the window")
         text.Alignment = fyne.TextAlignCenter

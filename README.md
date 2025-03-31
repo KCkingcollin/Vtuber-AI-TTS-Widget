@@ -20,8 +20,8 @@ If you are on windows then you are SOL, you will need to use wsl2 or set up a Li
 You may need the voice(s).bin/onnx/json files for the spec file to work, put them into the `kokoro-tts` folder.\
 Here is where to download them:\
 https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json \
-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin \
-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx
+https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin \
+https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
 
 First move to the `kokoro-tts` folder and run ```python -m venv venv``` or if you want to make the windows environment ```wine python -m venv winvenv```.\
 Make sure the venv is in the `kokoro-tts` folder.
