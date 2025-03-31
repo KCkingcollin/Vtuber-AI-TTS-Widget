@@ -17,9 +17,10 @@ If you need to revert to default settings simply delete the settings.json file a
 If you'd like to build the app then you'll need python 3.13.2, GO, and if you're building it for windows x86_64-w64-mingw32-gcc.\
 If you are on windows then you are SOL, you will need to use wsl2 or set up a Linux environment so you can compile it there, I do not know why, but it seems to be far more difficult to build the windows exes in windows as crazy as that sounds. I tried in VM and I almost jumped off a bridge, so just don't.
 
-You may need the voice(s).bin/onnx/json files for the spec file to work, put them into the `kokoro-tts` folder. Here is where to download them:\
-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json\
-https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin\
+You may need the voice(s).bin/onnx/json files for the spec file to work, put them into the `kokoro-tts` folder.\
+Here is where to download them:\
+https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json \
+https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin \
 https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx
 
 First move to the `kokoro-tts` folder and run ```python -m venv venv``` or if you want to make the windows environment ```wine python -m venv winvenv```.\
