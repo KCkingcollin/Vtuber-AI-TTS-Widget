@@ -1,8 +1,8 @@
 # Vtuber-AI-TTS-Widget
 VATTS (Vtuber-AI-TTS-Widget)
 
-If you're on Linux download the Linux zip from the [https://github.com/KCkingcollin/Vtuber-AI-TTS-Widget/releases](releases), and simply run VATTS
-If you're on Windows download the Windows zip from the [https://github.com/KCkingcollin/Vtuber-AI-TTS-Widget/releases](releases), and simply run VATTS.exe
+If you're on Linux download the Linux zip from the [releases](https://github.com/KCkingcollin/Vtuber-AI-TTS-Widget/releases), and simply run VATTS
+If you're on Windows download the Windows zip from the [releases](https://github.com/KCkingcollin/Vtuber-AI-TTS-Widget/releases), and simply run VATTS.exe
 
 When you first start it, it will download all that it needs to run, do not close the windows or shutdown during the process otherwise it may not finish installing everything it needs. 
 
