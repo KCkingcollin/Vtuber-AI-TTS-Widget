@@ -30,5 +30,7 @@ You can use the requirements.txt to install all you'll need to build it, just ru
 
 After building the python exe you'll need to run ```go mod tidy``` to get all the modules that are required to build it. Then simply run ```go build -v -o VATTS main.go```, for the windows exe run ```GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc go build -v -ldflags="-H windowsgui" -o VATTS.exe```.
 
-Finally, just put all the exes and necessary files in the right folders, the python exe and its `_internal` folder will be in the `kokoro-tts/dist` folder, so move both them into the project root or where ever `VATTS` will be. You don't reall need the kokoro-tts folder in the final project, VATTS will download what it needs as long as it at least has the server exe, the internal folder, and itself.
+Finally, just put all the exes and necessary files in the folder you want them to be in.\
+The python exe and its `_internal` folder will be in the `kokoro-tts/dist` folder, so move both them into the project root or wherever `VATTS` will be.\
+You don't really need the `kokoro-tts` folder in the final project, VATTS will download what it needs as long as it at least has the server exe, the internal folder, and itself, but you can make the kokoro-tts folder and put the voice(s) files in there to save yourself some time if you already downloaded them.
 
