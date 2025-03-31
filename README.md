@@ -1,6 +1,7 @@
 # Vtuber-AI-TTS-Widget
 VATTS (Vtuber-AI-TTS-Widget)
 
+## Users
 If you're on Linux download the Linux zip from the [releases](https://github.com/KCkingcollin/Vtuber-AI-TTS-Widget/releases), and simply run VATTS\
 If you're on Windows download the Windows zip from the [releases](https://github.com/KCkingcollin/Vtuber-AI-TTS-Widget/releases), and simply run VATTS.exe
 
@@ -12,6 +13,7 @@ Experimental configuration is available via the settings.json file in the config
 If you need to revert to default settings simply delete the settings.json file and restart the app.
 
 
+## Developers
 If you'd like to build the app then you'll need python 3.13.2, GO, and if you're building it for windows x86_64-w64-mingw32-gcc.\
 If you are on windows then you are SOL, you will need to use wsl2 or set up a Linux environment so you can compile it there, I do not know why, but it seems to be far more difficult to build the windows exes in windows as crazy as that sounds. I tried in VM and I almost jumped off a bridge, so just don't.
 
