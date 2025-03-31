@@ -22,7 +22,10 @@ https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices
 https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin
 https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx
 
-You can use the requirements.txt to set up a venv for python with all you'll need to build it, make sure to create the python venv folder in the `kokoro-tts` folder as there is no guarantee that i wont add something from there to the spec file, then just run ```pyinstaller tts-server.spec``` or if you're making the windows exe run ```wine ./winvenv/Scripts/pyinstaller.exe tts-server-win.spec```
+First move to the `kokoro-tts` folder and run ```python -m venv venv``` or if you want to make the windows environment ```wine python -m venv winvenv```.\
+Make sure the venv is in the `kokoro-tts` folder.
+
+You can use the requirements.txt to install all you'll need to build it, just run ```pip install -r requirements.txt``` or for the windows build run ```wine winvenv/Scripts/pip.exe install -r requirements.txt```, then just run ```pyinstaller tts-server.spec``` or for a windows exe run ```wine ./winvenv/Scripts/pyinstaller.exe tts-server-win.spec```.
 
 After building the python exe you'll need to run ```go mod tidy``` to get all the modules that are required to build it. Then simply run ```go build -v -o VATTS main.go```, for the windows exe run ```GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc go build -v -ldflags="-H windowsgui" -o VATTS.exe```.
 
